@@ -35,6 +35,20 @@ The `/image.jpg` endpoint accepts an optional `orientation` query parameter:
 portrait source image processed for the frame. If Immich's random results have
 no image in the requested orientation, the endpoint returns an error.
 
+It also accepts an optional `people` query parameter with one or more Immich
+person IDs. Use commas or repeated parameters to specify multiple people;
+results matching any of those people are eligible. For example:
+`http://your-service-host:18765/image.jpg?people=id1,id2`.
+
+## Getting a person’s ID from Immich
+
+1. Open Immich’s web interface and click on “Explore” in the left-hand navigation.
+2. Click on the person you want the ID of (you may have to click “view all” if you don’t see them).
+3. The URL will now look something like this:
+   `http://192.168.86.123:2283/people/a04175f4-97bb-4d97-8d49-3700263043e5`.
+4. The person’s ID is everything after `people/`; in this example:
+   `a04175f4-97bb-4d97-8d49-3700263043e5`.
+
 ## Set up the Inky Frame
 
 First, follow the [Pimoroni Inky Frame setup guide](https://learn.pimoroni.com/article/getting-started-with-inky-frame)

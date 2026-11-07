@@ -79,13 +79,16 @@ def _response_json(response, operation):
         raise ServiceError(f"Immich {operation} returned invalid JSON.") from error
 
 
-def fetch_random_thumbnail(orientation="both"):
+def fetch_random_thumbnail(orientation="both", people=None):
     api_base, api_key = _configuration()
     headers = {"x-api-key": api_key}
+    search_filter: dict[str, object] = {"type": {"eq": "IMAGE"}}
+    if people:
+        search_filter["personIds"] = {"any": people}
     try:
         search_response = requests.post(
             f"{api_base}/search/random",
-            json={"size": 20, "filter": {"type": {"eq": "IMAGE"}}},
+            json={"size": 20, "filter": search_filter},
             headers=headers,
             timeout=REQUEST_TIMEOUT,
         )
@@ -153,9 +156,15 @@ def image():
     orientation = request.args.get("orientation", "both")
     if orientation not in ORIENTATIONS:
         return jsonify(error="orientation must be landscape, portrait, or both."), 400
+    people = [
+        person_id.strip()
+        for value in request.args.getlist("people")
+        for person_id in value.split(",")
+        if person_id.strip()
+    ]
 
     try:
-        jpeg_bytes = process_image(fetch_random_thumbnail(orientation))
+        jpeg_bytes = process_image(fetch_random_thumbnail(orientation, people))
     except ServiceError as error:
         app.logger.warning("Image request failed: %s", error)
         status_code = 503 if isinstance(error, ConfigurationError) else 502

@@ -91,10 +91,42 @@ class EndpointTests(unittest.TestCase):
             self.assertEqual(output.size, (800, 480))
         self.assertEqual(mock_post.call_args.args[0], "http://immich:2283/api/search/random")
         self.assertEqual(
+            mock_post.call_args.kwargs["json"],
+            {"size": 20, "filter": {"type": {"eq": "IMAGE"}}},
+        )
+        self.assertEqual(
             mock_get.call_args.args[0],
             "http://immich:2283/api/assets/asset-id/thumbnail",
         )
         self.assertEqual(mock_get.call_args.kwargs["params"], {"size": "preview"})
+
+    @patch.dict(os.environ, {"IMMICH_URL": "http://immich:2283", "IMMICH_API_KEY": "test-key"})
+    @patch("app.requests.get")
+    @patch("app.requests.post")
+    def test_people_parameter_filters_for_any_person_id(self, mock_post, mock_get):
+        mock_post.return_value.json.return_value = [{"id": "asset-id"}]
+        mock_get.return_value.content = make_image((400, 300), (120, 130, 140))
+
+        people_ids = [
+            "a04175f4-97bb-4d97-8d49-3700263043e5",
+            "b04175f4-97bb-4d97-8d49-3700263043e5",
+            "c04175f4-97bb-4d97-8d49-3700263043e5",
+        ]
+        response = self.client.get(
+            f"/image.jpg?people={people_ids[0]},{people_ids[1]}&people={people_ids[2]}"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            mock_post.call_args.kwargs["json"],
+            {
+                "size": 20,
+                "filter": {
+                    "type": {"eq": "IMAGE"},
+                    "personIds": {"any": people_ids},
+                },
+            },
+        )
 
     @patch.dict(os.environ, {"IMMICH_URL": "http://immich:2283", "IMMICH_API_KEY": "test-key"})
     @patch("app.random.shuffle")
