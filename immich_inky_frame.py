@@ -13,7 +13,7 @@ WIDTH = None
 HEIGHT = None
 
 FILENAME = "immich-image"
-API_BASE = "http://your-immich-server:2283/api"
+API_BASE = "http://your-service-host:2283/api"
 HEADERS = {"x-api-key": IMMICH_API_KEY}
 
 # Length of time between updates in minutes.
@@ -262,3 +262,4 @@ def draw():
 
     gc.collect()
     graphics.update()
+
