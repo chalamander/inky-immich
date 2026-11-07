@@ -14,9 +14,14 @@ HEIGHT = 480
 REQUEST_TIMEOUT = (5, 20)
 JPEG_QUALITY = 100
 SATURATION_FACTOR = 1.3
-BRIGHTNESS_FACTOR = 1.1
-GAMMA = 0.8
-GAMMA_LUT = [round(255 * (value / 255) ** GAMMA) for value in range(256)] * 3
+SHADOW_THRESHOLD = 160
+MAX_SHADOW_LIFT = 32
+SHADOW_LUT = [
+    round(
+        value + MAX_SHADOW_LIFT * (1 - value / SHADOW_THRESHOLD) ** 2
+    ) if value < SHADOW_THRESHOLD else value
+    for value in range(256)
+]
 ORIENTATIONS = {"landscape", "portrait", "both"}
 
 
@@ -41,8 +46,12 @@ def process_image(image_bytes, orientation="both"):
                 centering=(0.5, 0.5),
             )
             saturated = ImageEnhance.Color(fitted).enhance(SATURATION_FACTOR)
-            brightened = ImageEnhance.Brightness(saturated).enhance(BRIGHTNESS_FACTOR)
-            enhanced = brightened.point(GAMMA_LUT)
+            luminance, chroma_blue, chroma_red = saturated.convert("YCbCr").split()
+            lifted_luminance = luminance.point(SHADOW_LUT)
+            enhanced = Image.merge(
+                "YCbCr",
+                (lifted_luminance, chroma_blue, chroma_red),
+            ).convert("RGB")
         output = io.BytesIO()
         enhanced.save(
             output,

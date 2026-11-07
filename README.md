@@ -71,11 +71,12 @@ downloads a preview thumbnail. When a specific orientation is requested, it
 selects a thumbnail with that orientation after applying EXIF rotation. The
 service applies EXIF orientation and, for portrait requests, rotates the image
 90° clockwise for a screen mounted at -90°. It then performs a centered
-aspect-preserving crop/resize to 800×480, increases saturation by 1.3×, and
-increases brightness by 1.1×, then applies gamma correction with an exponent of
-0.8 to lift midtones. It does not apply palette quantization or dithering. The
-image is encoded as JPEG at quality 100 with chroma subsampling disabled to
-preserve source detail as much as JPEG allows, then returned as `image/jpeg`.
+aspect-preserving crop/resize to 800×480 and increases saturation by 1.3×.
+Next, it lifts shadows in the luminance channel by up to 32 levels, tapering
+the adjustment to zero at luminance 160 so lighter areas remain unchanged. It
+does not apply palette quantization or dithering. The image is encoded as JPEG
+at quality 100 with chroma subsampling disabled to preserve source detail as
+much as JPEG allows, then returned as `image/jpeg`.
 
 Immich or image-processing failures return a JSON error with HTTP 502.
 Missing Immich configuration returns HTTP 503.

@@ -42,16 +42,19 @@ class ProcessImageTests(unittest.TestCase):
 
         self.assertGreater(pixel[2] - pixel[0], source_color[2] - source_color[0])
 
-    def test_brightness_and_gamma_correction_brighten_midtones(self):
-        source_color = (100, 100, 100)
-        result = app.process_image(make_image((800, 480), source_color))
+    def test_shadow_lift_brightens_shadows_and_preserves_highlights(self):
+        shadow = make_image((800, 480), (40, 40, 40))
+        highlight = make_image((800, 480), (200, 200, 200))
 
-        with Image.open(io.BytesIO(result)) as output:
-            pixel = output.getpixel((400, 240))
+        with Image.open(io.BytesIO(app.process_image(shadow))) as output:
+            shadow_pixel = output.getpixel((400, 240))
+        with Image.open(io.BytesIO(app.process_image(highlight))) as output:
+            highlight_pixel = output.getpixel((400, 240))
 
-        expected = round(255 * ((source_color[0] / 255) * app.BRIGHTNESS_FACTOR) ** app.GAMMA)
-        self.assertAlmostEqual(pixel[0], expected, delta=2)
-        self.assertLessEqual(max(pixel) - min(pixel), 2)
+        self.assertGreater(shadow_pixel[0], 40)
+        self.assertLessEqual(max(shadow_pixel) - min(shadow_pixel), 2)
+        self.assertAlmostEqual(highlight_pixel[0], 200, delta=2)
+        self.assertLessEqual(max(highlight_pixel) - min(highlight_pixel), 2)
 
     def test_applies_exif_orientation_before_fit(self):
         pixels = Image.new("RGB", (120, 60), "black")
@@ -67,7 +70,11 @@ class ProcessImageTests(unittest.TestCase):
 
         with Image.open(io.BytesIO(result)) as output:
             self.assertEqual(output.size, (800, 480))
-            self.assertEqual(output.getpixel((400, 30))[0], 0)
+            self.assertAlmostEqual(
+                output.getpixel((400, 30))[0],
+                app.SHADOW_LUT[0],
+                delta=2,
+            )
             self.assertEqual(output.getpixel((400, 450))[0], 255)
 
     def test_orientation_matching_applies_exif_rotation(self):
