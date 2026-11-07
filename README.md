@@ -23,8 +23,8 @@ Start the service with Docker Compose:
 docker compose up --build -d
 ```
 
-The service listens on port `8000`; request
-`http://your-service-host:8000/image.jpg`. Configure the frame to request the
+The service listens on host port `18765` (container port `8000`); request
+`http://your-service-host:18765/image.jpg`. Configure the frame to request the
 same URL. The container health check uses a separate `/healthz` endpoint and
 does not make extra requests to Immich.
 

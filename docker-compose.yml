@@ -2,7 +2,7 @@ services:
   inky-immich:
     build: .
     ports:
-      - "8000:8000"
+      - "18765:8000"
     environment:
       IMMICH_URL: ${IMMICH_URL:?Set IMMICH_URL in your environment or .env file}
       IMMICH_API_KEY: ${IMMICH_API_KEY:?Set IMMICH_API_KEY in your environment or .env file}
