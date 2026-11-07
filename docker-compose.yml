@@ -1,0 +1,15 @@
+services:
+  inky-immich:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      IMMICH_URL: ${IMMICH_URL:?Set IMMICH_URL in your environment or .env file}
+      IMMICH_API_KEY: ${IMMICH_API_KEY:?Set IMMICH_API_KEY in your environment or .env file}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=5).close()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
