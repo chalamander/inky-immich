@@ -49,8 +49,12 @@ one, and downloads its preview thumbnail. It applies EXIF orientation, a
 centered aspect-preserving crop, resizes to exactly 800×480, then quantizes
 and dithers to `#000000`, `#FFFFFF`, `#A02020`, `#F0E050`, `#608050`, and
 `#5080B8`. The result is encoded as high-quality JPEG with chroma subsampling
-disabled and returned as `image/jpeg`. JPEG compression may slightly alter
-the palette colors; verify color fidelity on the actual frame.
+disabled and returned as `image/jpeg`. Before palette mapping, it applies
+subtle contrast and color boosts plus edge sharpening to help photos retain
+definition on the limited e-ink palette. These adjustments are inspired by
+[InkyStream's image-processing approach](https://github.com/8ix/inkystream).
+JPEG compression may slightly alter the palette colors; verify the result on
+the actual frame.
 
 Immich or image-processing failures return a JSON error with HTTP 502.
 Missing Immich configuration returns HTTP 503.

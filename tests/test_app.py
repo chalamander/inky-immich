@@ -19,6 +19,37 @@ def make_image(size, color, image_format="JPEG", exif=None):
 
 
 class ProcessImageTests(unittest.TestCase):
+    def test_display_preparation_boosts_contrast_color_and_edges(self):
+        grayscale = Image.new("RGB", (100, 10))
+        muted_color = Image.new("RGB", (100, 10))
+        for x in range(100):
+            level = 105 + x // 2
+            grayscale.paste((level, level, level), (x, 0, x + 1, 10))
+            muted_color.paste((level, level - 10, level - 10), (x, 0, x + 1, 10))
+
+        prepared_grayscale = app._prepare_for_display(grayscale)
+        prepared_color = app._prepare_for_display(muted_color)
+        input_contrast = grayscale.getextrema()[0][1] - grayscale.getextrema()[0][0]
+        output_contrast = (
+            prepared_grayscale.getextrema()[0][1] - prepared_grayscale.getextrema()[0][0]
+        )
+        input_saturation = muted_color.getpixel((75, 5))[0] - muted_color.getpixel((75, 5))[1]
+        output_saturation = (
+            prepared_color.getpixel((75, 5))[0] - prepared_color.getpixel((75, 5))[1]
+        )
+        self.assertGreater(output_contrast, input_contrast)
+        self.assertGreater(output_saturation, input_saturation)
+
+        edge = Image.new("RGB", (20, 10), (100, 100, 100))
+        for x in range(10, 20):
+            edge.paste((150, 150, 150), (x, 0, x + 1, 10))
+        prepared_edge = app._prepare_for_display(edge)
+        input_edge = edge.getpixel((10, 5))[0] - edge.getpixel((9, 5))[0]
+        output_edge = (
+            prepared_edge.getpixel((10, 5))[0] - prepared_edge.getpixel((9, 5))[0]
+        )
+        self.assertGreater(output_edge, input_edge)
+
     def test_outputs_jpeg_at_target_size_for_varied_inputs(self):
         cases = [
             ((240, 480), "portrait"),

@@ -5,7 +5,7 @@ from urllib.parse import quote
 
 import requests
 from flask import Flask, Response, jsonify
-from PIL import Image, ImageOps, UnidentifiedImageError
+from PIL import Image, ImageEnhance, ImageFilter, ImageOps, UnidentifiedImageError
 
 app = Flask(__name__)
 
@@ -35,6 +35,12 @@ def _palette_image():
     return palette
 
 
+def _prepare_for_display(image):
+    image = ImageEnhance.Contrast(image).enhance(1.12)
+    image = ImageEnhance.Color(image).enhance(1.15)
+    return image.filter(ImageFilter.UnsharpMask(radius=1, percent=125, threshold=3))
+
+
 def process_image(image_bytes):
     try:
         with Image.open(io.BytesIO(image_bytes)) as source:
@@ -45,7 +51,8 @@ def process_image(image_bytes):
                 method=Image.Resampling.LANCZOS,
                 centering=(0.5, 0.5),
             )
-        quantized = fitted.quantize(
+        prepared = _prepare_for_display(fitted)
+        quantized = prepared.quantize(
             palette=_palette_image(),
             dither=Image.Dither.FLOYDSTEINBERG,
         )
