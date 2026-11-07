@@ -33,17 +33,24 @@ class ProcessImageTests(unittest.TestCase):
                     self.assertEqual(output.size, (800, 480))
                     self.assertEqual(output.mode, "RGB")
 
-    def test_preserves_source_colors_without_palette_mapping_or_enhancement(self):
+    def test_increases_saturation(self):
         source_color = (123, 77, 189)
         result = app.process_image(make_image((800, 480), source_color))
 
         with Image.open(io.BytesIO(result)) as output:
             pixel = output.getpixel((400, 240))
 
-        self.assertLessEqual(
-            max(abs(channel - source) for channel, source in zip(pixel, source_color)),
-            2,
-        )
+        self.assertGreater(pixel[2] - pixel[0], source_color[2] - source_color[0])
+
+    def test_gamma_correction_brightens_midtones(self):
+        source_color = (100, 100, 100)
+        result = app.process_image(make_image((800, 480), source_color))
+
+        with Image.open(io.BytesIO(result)) as output:
+            pixel = output.getpixel((400, 240))
+
+        self.assertGreater(pixel[0], source_color[0])
+        self.assertLessEqual(max(pixel) - min(pixel), 2)
 
     def test_applies_exif_orientation_before_fit(self):
         pixels = Image.new("RGB", (120, 60), "black")

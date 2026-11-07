@@ -68,10 +68,11 @@ For each request, the service searches Immich for random image assets and
 downloads a preview thumbnail. When a specific orientation is requested, it
 selects a thumbnail with that orientation after applying EXIF rotation. The
 service applies EXIF orientation and a centered aspect-preserving crop/resize
-to exactly 800×480. It does not
-apply color enhancement, sharpening, palette quantization, or dithering. The
-image is encoded as JPEG at quality 100 with chroma subsampling disabled to
-preserve source detail as much as JPEG allows, then returned as `image/jpeg`.
+to exactly 800×480, then increases saturation by 1.3× and applies gamma
+correction with an exponent of 0.9 to brighten midtones. It does not apply
+palette quantization or dithering. The image is encoded as JPEG at quality 100
+with chroma subsampling disabled to preserve source detail as much as JPEG
+allows, then returned as `image/jpeg`.
 
 Immich or image-processing failures return a JSON error with HTTP 502.
 Missing Immich configuration returns HTTP 503.

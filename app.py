@@ -5,7 +5,7 @@ from urllib.parse import quote
 
 import requests
 from flask import Flask, Response, jsonify, request
-from PIL import Image, ImageOps, UnidentifiedImageError
+from PIL import Image, ImageEnhance, ImageOps, UnidentifiedImageError
 
 app = Flask(__name__)
 
@@ -13,6 +13,9 @@ WIDTH = 800
 HEIGHT = 480
 REQUEST_TIMEOUT = (5, 20)
 JPEG_QUALITY = 100
+SATURATION_FACTOR = 1.3
+GAMMA = 0.9
+GAMMA_LUT = [round(255 * (value / 255) ** GAMMA) for value in range(256)] * 3
 ORIENTATIONS = {"landscape", "portrait", "both"}
 
 
@@ -34,8 +37,10 @@ def process_image(image_bytes):
                 method=Image.Resampling.LANCZOS,
                 centering=(0.5, 0.5),
             )
+            saturated = ImageEnhance.Color(fitted).enhance(SATURATION_FACTOR)
+            enhanced = saturated.point(GAMMA_LUT)
         output = io.BytesIO()
-        fitted.save(
+        enhanced.save(
             output,
             format="JPEG",
             quality=JPEG_QUALITY,
