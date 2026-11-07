@@ -77,6 +77,23 @@ class ProcessImageTests(unittest.TestCase):
         self.assertTrue(app._matches_orientation(image_bytes, "portrait"))
         self.assertFalse(app._matches_orientation(image_bytes, "landscape"))
 
+    def test_portrait_images_are_rotated_clockwise_and_fit_landscape_output(self):
+        source = Image.new("RGB", (300, 500), "red")
+        for y in range(250, 500):
+            for x in range(300):
+                source.putpixel((x, y), (0, 0, 255))
+        image_bytes = io.BytesIO()
+        source.save(image_bytes, format="JPEG", quality=100)
+
+        result = app.process_image(image_bytes.getvalue(), "portrait")
+
+        with Image.open(io.BytesIO(result)) as output:
+            self.assertEqual(output.size, (800, 480))
+            left_pixel = output.getpixel((100, 240))
+            right_pixel = output.getpixel((700, 240))
+        self.assertGreater(left_pixel[2], left_pixel[0])
+        self.assertGreater(right_pixel[0], right_pixel[2])
+
 
 class EndpointTests(unittest.TestCase):
     def setUp(self):
@@ -172,6 +189,8 @@ class EndpointTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("/assets/portrait/thumbnail", mock_get.call_args.args[0])
+        with Image.open(io.BytesIO(response.data)) as output:
+            self.assertEqual(output.size, (800, 480))
 
     @patch.dict(os.environ, {"IMMICH_URL": "http://immich:2283", "IMMICH_API_KEY": "test-key"})
     @patch("app.random.shuffle", side_effect=lambda candidates: None)

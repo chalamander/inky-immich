@@ -27,10 +27,12 @@ class ConfigurationError(ServiceError):
     pass
 
 
-def process_image(image_bytes):
+def process_image(image_bytes, orientation="both"):
     try:
         with Image.open(io.BytesIO(image_bytes)) as source:
             oriented = ImageOps.exif_transpose(source).convert("RGB")
+            if orientation == "portrait":
+                oriented = oriented.transpose(Image.Transpose.ROTATE_270)
             fitted = ImageOps.fit(
                 oriented,
                 (WIDTH, HEIGHT),
@@ -169,7 +171,10 @@ def image():
     ]
 
     try:
-        jpeg_bytes = process_image(fetch_random_thumbnail(orientation, people))
+        jpeg_bytes = process_image(
+            fetch_random_thumbnail(orientation, people),
+            orientation,
+        )
     except ServiceError as error:
         app.logger.warning("Image request failed: %s", error)
         status_code = 503 if isinstance(error, ConfigurationError) else 502

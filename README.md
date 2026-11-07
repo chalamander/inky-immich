@@ -32,8 +32,10 @@ endpoint and does not make extra requests to Immich.
 The `/image.jpg` endpoint accepts an optional `orientation` query parameter:
 `landscape`, `portrait`, or `both`. It defaults to `both`; for example,
 `http://your-service-host:18765/image.jpg?orientation=portrait` returns a
-portrait source image processed for the frame. If Immich's random results have
-no image in the requested orientation, the endpoint returns an error.
+portrait source image rotated 90° clockwise for a screen mounted at -90°.
+Images are returned at 800×480; `both` preserves the default behavior. If
+Immich's random results have no image in the requested orientation, the
+endpoint returns an error.
 
 It also accepts an optional `people` query parameter with one or more Immich
 person IDs. Use commas or repeated parameters to specify multiple people;
@@ -67,12 +69,13 @@ should retrieve and display images from the `/image.jpg` endpoint.
 For each request, the service searches Immich for random image assets and
 downloads a preview thumbnail. When a specific orientation is requested, it
 selects a thumbnail with that orientation after applying EXIF rotation. The
-service applies EXIF orientation and a centered aspect-preserving crop/resize
-to exactly 800×480, then increases saturation by 1.3× and applies gamma
-correction with an exponent of 0.9 to brighten midtones. It does not apply
-palette quantization or dithering. The image is encoded as JPEG at quality 100
-with chroma subsampling disabled to preserve source detail as much as JPEG
-allows, then returned as `image/jpeg`.
+service applies EXIF orientation and, for portrait requests, rotates the image
+90° clockwise for a screen mounted at -90°. It then performs a centered
+aspect-preserving crop/resize to 800×480, increases saturation by 1.3×, and
+applies gamma correction with an exponent of 0.9 to brighten midtones. It does
+not apply palette quantization or dithering. The image is encoded as JPEG at
+quality 100 with chroma subsampling disabled to preserve source detail as much
+as JPEG allows, then returned as `image/jpeg`.
 
 Immich or image-processing failures return a JSON error with HTTP 502.
 Missing Immich configuration returns HTTP 503.
