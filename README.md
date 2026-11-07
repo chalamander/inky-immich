@@ -42,6 +42,12 @@ person IDs. Use commas or repeated parameters to specify multiple people;
 results matching any of those people are eligible. For example:
 `http://your-service-host:18765/image.jpg?people=id1,id2`.
 
+Use `includeTags` to restrict results to images matching any listed tag, or
+`excludeTags` to omit images matching any listed tag. Supply Immich tag IDs
+as comma-separated values or repeated parameters. For example:
+`http://your-service-host:18765/image.jpg?includeTags=tag1,tag2&excludeTags=tag3`.
+Both parameters can be used together.
+
 ## Getting a person’s ID from Immich
 
 1. Open Immich’s web interface and click on “Explore” in the left-hand navigation.

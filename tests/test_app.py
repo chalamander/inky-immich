@@ -161,6 +161,45 @@ class EndpointTests(unittest.TestCase):
         )
 
     @patch.dict(os.environ, {"IMMICH_URL": "http://immich:2283", "IMMICH_API_KEY": "test-key"})
+    @patch("app.requests.get")
+    @patch("app.requests.post")
+    def test_tag_parameters_include_any_and_exclude_any_matching_tag(
+        self,
+        mock_post,
+        mock_get,
+    ):
+        mock_post.return_value.json.return_value = [{"id": "asset-id"}]
+        mock_get.return_value.content = make_image((400, 300), (120, 130, 140))
+        include_tags = [
+            "a04175f4-97bb-4d97-8d49-3700263043e5",
+            "b04175f4-97bb-4d97-8d49-3700263043e5",
+            "c04175f4-97bb-4d97-8d49-3700263043e5",
+        ]
+        exclude_tags = [
+            "d04175f4-97bb-4d97-8d49-3700263043e5",
+            "e04175f4-97bb-4d97-8d49-3700263043e5",
+        ]
+
+        response = self.client.get(
+            "/image.jpg"
+            f"?includeTags={include_tags[0]},{include_tags[1]}"
+            f"&includeTags={include_tags[2]}"
+            f"&excludeTags={exclude_tags[0]},{exclude_tags[1]}"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            mock_post.call_args.kwargs["json"],
+            {
+                "size": 20,
+                "filter": {
+                    "type": {"eq": "IMAGE"},
+                    "tagIds": {"any": include_tags, "none": exclude_tags},
+                },
+            },
+        )
+
+    @patch.dict(os.environ, {"IMMICH_URL": "http://immich:2283", "IMMICH_API_KEY": "test-key"})
     @patch("app.random.shuffle")
     @patch("app.requests.get")
     @patch("app.requests.post")

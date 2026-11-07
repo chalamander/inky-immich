@@ -97,12 +97,24 @@ def _response_json(response, operation):
         raise ServiceError(f"Immich {operation} returned invalid JSON.") from error
 
 
-def fetch_random_thumbnail(orientation="both", people=None):
+def fetch_random_thumbnail(
+    orientation="both",
+    people=None,
+    include_tags=None,
+    exclude_tags=None,
+):
     api_base, api_key = _configuration()
     headers = {"x-api-key": api_key}
     search_filter: dict[str, object] = {"type": {"eq": "IMAGE"}}
     if people:
         search_filter["personIds"] = {"any": people}
+    tag_filter: dict[str, object] = {}
+    if include_tags:
+        tag_filter["any"] = include_tags
+    if exclude_tags:
+        tag_filter["none"] = exclude_tags
+    if tag_filter:
+        search_filter["tagIds"] = tag_filter
     try:
         search_response = requests.post(
             f"{api_base}/search/random",
@@ -180,12 +192,27 @@ def image():
         for person_id in value.split(",")
         if person_id.strip()
     ]
+    include_tags = [
+        tag.strip()
+        for value in request.args.getlist("includeTags")
+        for tag in value.split(",")
+        if tag.strip()
+    ]
+    exclude_tags = [
+        tag.strip()
+        for value in request.args.getlist("excludeTags")
+        for tag in value.split(",")
+        if tag.strip()
+    ]
 
     try:
-        jpeg_bytes = process_image(
-            fetch_random_thumbnail(orientation, people),
+        thumbnail = fetch_random_thumbnail(
             orientation,
+            people,
+            include_tags,
+            exclude_tags,
         )
+        jpeg_bytes = process_image(thumbnail, orientation)
     except ServiceError as error:
         app.logger.warning("Image request failed: %s", error)
         status_code = 503 if isinstance(error, ConfigurationError) else 502
