@@ -1,4 +1,5 @@
 import gc
+import time
 from urllib import urequest
 
 import jpegdec
@@ -18,38 +19,50 @@ FILENAME = "immich-image.jpg"
 # Frequent updates will reduce battery life!
 UPDATE_INTERVAL = 240
 
+REQUEST_TIMEOUT_SECONDS = 10
+RETRY_DELAY_SECONDS = 10
+MAX_FETCH_ATTEMPTS = 20
+
 image_error = None
 
 
 def update():
     global image_error
 
-    try:
-        response = urequest.urlopen(IMAGE_URL)
+    image_error = None
+    for attempt in range(MAX_FETCH_ATTEMPTS):
         try:
-            downloaded = 0
-            data = bytearray(1024)
-            with open(FILENAME, "wb") as image_file:
-                while True:
-                    bytes_read = response.readinto(data)
-                    if not bytes_read:
-                        break
-                    if downloaded == 0 and (
-                        bytes_read < 2 or data[0] != 0xFF or data[1] != 0xD8
-                    ):
-                        raise ValueError("Image service did not return a JPEG")
-                    image_file.write(data[:bytes_read])
-                    downloaded += bytes_read
+            response = urequest.urlopen(IMAGE_URL, timeout=REQUEST_TIMEOUT_SECONDS)
+            try:
+                downloaded = 0
+                data = bytearray(1024)
+                with open(FILENAME, "wb") as image_file:
+                    while True:
+                        bytes_read = response.readinto(data)
+                        if not bytes_read:
+                            break
+                        if downloaded == 0 and (
+                            bytes_read < 2 or data[0] != 0xFF or data[1] != 0xD8
+                        ):
+                            raise ValueError("Image service did not return a JPEG")
+                        image_file.write(data[:bytes_read])
+                        downloaded += bytes_read
 
-            if downloaded == 0:
-                raise ValueError("Image service returned an empty image")
-            image_error = None
-        finally:
-            response.close()
+                if downloaded == 0:
+                    raise ValueError("Image service returned an empty image")
+            finally:
+                response.close()
+        except (OSError, ValueError) as error:
+            print(error)
+            if attempt == MAX_FETCH_ATTEMPTS - 1:
+                image_error = "Unable to fetch image"
+            else:
+                time.sleep(RETRY_DELAY_SECONDS)
+        else:
+            break
         gc.collect()
-    except (OSError, ValueError) as error:
-        print(error)
-        image_error = "Unable to fetch image"
+
+    gc.collect()
 
 
 def draw_error(message):
