@@ -24,9 +24,23 @@ docker compose up --build -d
 ```
 
 The service listens on host port `18765` (container port `8000`); request
-`http://your-service-host:18765/image.jpg`. Configure the frame to request the
-same URL. The container health check uses a separate `/healthz` endpoint and
-does not make extra requests to Immich.
+`http://your-service-host:18765/image.jpg`. Set `IMAGE_URL` in
+[`immich_inky_frame.py`](./immich_inky_frame.py) to this address, replacing the
+default host if needed. The container health check uses a separate `/healthz`
+endpoint and does not make extra requests to Immich.
+
+## Set up the Inky Frame
+
+First, follow the [Pimoroni Inky Frame setup guide](https://learn.pimoroni.com/article/getting-started-with-inky-frame)
+to prepare the device and set up Thonny. Open `immich_inky_frame.py` in Thonny
+and copy/save it to the Inky Frame.
+
+Before copying the script, change `IMAGE_URL` in the Python file to the
+`/image.jpg` URL for the server running inky-immich, for example
+`http://your-service-host:18765/image.jpg`.
+
+Once the script is on the device and the web server is running, the Inky Frame
+should retrieve and display images from the `/image.jpg` endpoint.
 
 ## Image processing
 
