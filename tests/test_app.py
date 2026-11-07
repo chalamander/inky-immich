@@ -1,7 +1,7 @@
 import io
 import os
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from PIL import Image
 
@@ -62,6 +62,14 @@ class ProcessImageTests(unittest.TestCase):
             self.assertEqual(output.getpixel((400, 30))[0], 0)
             self.assertEqual(output.getpixel((400, 450))[0], 255)
 
+    def test_orientation_matching_applies_exif_rotation(self):
+        exif = Image.Exif()
+        exif[274] = 6
+        image_bytes = make_image((120, 60), (30, 40, 50), exif=exif)
+
+        self.assertTrue(app._matches_orientation(image_bytes, "portrait"))
+        self.assertFalse(app._matches_orientation(image_bytes, "landscape"))
+
 
 class EndpointTests(unittest.TestCase):
     def setUp(self):
@@ -87,6 +95,71 @@ class EndpointTests(unittest.TestCase):
             "http://immich:2283/api/assets/asset-id/thumbnail",
         )
         self.assertEqual(mock_get.call_args.kwargs["params"], {"size": "preview"})
+
+    @patch.dict(os.environ, {"IMMICH_URL": "http://immich:2283", "IMMICH_API_KEY": "test-key"})
+    @patch("app.random.shuffle")
+    @patch("app.requests.get")
+    @patch("app.requests.post")
+    def test_orientation_parameter_skips_thumbnails_with_the_wrong_orientation(
+        self,
+        mock_post,
+        mock_get,
+        mock_shuffle,
+    ):
+        mock_post.return_value.json.return_value = [
+            {"id": "portrait"},
+            {"id": "landscape"},
+        ]
+        mock_shuffle.side_effect = lambda candidates: None
+        mock_get.side_effect = [
+            Mock(content=make_image((300, 500), (10, 20, 30))),
+            Mock(content=make_image((500, 300), (40, 50, 60))),
+        ]
+
+        response = self.client.get("/image.jpg?orientation=landscape")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(mock_get.call_count, 2)
+        self.assertIn("/assets/landscape/thumbnail", mock_get.call_args.args[0])
+
+    @patch.dict(os.environ, {"IMMICH_URL": "http://immich:2283", "IMMICH_API_KEY": "test-key"})
+    @patch("app.requests.get")
+    @patch("app.requests.post")
+    def test_portrait_orientation_returns_portrait_thumbnail(self, mock_post, mock_get):
+        mock_post.return_value.json.return_value = [{"id": "portrait"}]
+        mock_get.return_value.content = make_image((300, 500), (10, 20, 30))
+
+        response = self.client.get("/image.jpg?orientation=portrait")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("/assets/portrait/thumbnail", mock_get.call_args.args[0])
+
+    @patch.dict(os.environ, {"IMMICH_URL": "http://immich:2283", "IMMICH_API_KEY": "test-key"})
+    @patch("app.random.shuffle", side_effect=lambda candidates: None)
+    @patch("app.requests.get")
+    @patch("app.requests.post")
+    def test_orientation_parameter_returns_error_when_no_candidate_matches(
+        self,
+        mock_post,
+        mock_get,
+        _mock_shuffle,
+    ):
+        mock_post.return_value.json.return_value = [{"id": "landscape"}]
+        mock_get.return_value.content = make_image((500, 300), (40, 50, 60))
+
+        response = self.client.get("/image.jpg?orientation=portrait")
+
+        self.assertEqual(response.status_code, 502)
+        self.assertIn("no portrait images", response.get_json()["error"])
+
+    def test_invalid_orientation_returns_bad_request(self):
+        response = self.client.get("/image.jpg?orientation=square")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.get_json()["error"],
+            "orientation must be landscape, portrait, or both.",
+        )
 
     @patch.dict(os.environ, {}, clear=True)
     def test_missing_configuration_returns_clear_error(self):

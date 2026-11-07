@@ -29,6 +29,12 @@ The service listens on host port `18765` (container port `8000`); request
 default host if needed. The container health check uses a separate `/healthz`
 endpoint and does not make extra requests to Immich.
 
+The `/image.jpg` endpoint accepts an optional `orientation` query parameter:
+`landscape`, `portrait`, or `both`. It defaults to `both`; for example,
+`http://your-service-host:18765/image.jpg?orientation=portrait` returns a
+portrait source image processed for the frame. If Immich's random results have
+no image in the requested orientation, the endpoint returns an error.
+
 ## Set up the Inky Frame
 
 First, follow the [Pimoroni Inky Frame setup guide](https://learn.pimoroni.com/article/getting-started-with-inky-frame)
@@ -44,10 +50,11 @@ should retrieve and display images from the `/image.jpg` endpoint.
 
 ## Image processing
 
-For each request, the service searches Immich for random image assets, selects
-one, and downloads its preview thumbnail. It applies EXIF orientation, a
-one, and downloads its preview thumbnail. The service applies EXIF orientation
-and a centered aspect-preserving crop/resize to exactly 800×480. It does not
+For each request, the service searches Immich for random image assets and
+downloads a preview thumbnail. When a specific orientation is requested, it
+selects a thumbnail with that orientation after applying EXIF rotation. The
+service applies EXIF orientation and a centered aspect-preserving crop/resize
+to exactly 800×480. It does not
 apply color enhancement, sharpening, palette quantization, or dithering. The
 image is encoded as JPEG at quality 100 with chroma subsampling disabled to
 preserve source detail as much as JPEG allows, then returned as `image/jpeg`.

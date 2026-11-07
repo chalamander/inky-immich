@@ -4,7 +4,7 @@ import random
 from urllib.parse import quote
 
 import requests
-from flask import Flask, Response, jsonify
+from flask import Flask, Response, jsonify, request
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 app = Flask(__name__)
@@ -13,6 +13,7 @@ WIDTH = 800
 HEIGHT = 480
 REQUEST_TIMEOUT = (5, 20)
 JPEG_QUALITY = 100
+ORIENTATIONS = {"landscape", "portrait", "both"}
 
 
 class ServiceError(Exception):
@@ -45,6 +46,17 @@ def process_image(image_bytes):
     return output.getvalue()
 
 
+def _matches_orientation(image_bytes, orientation):
+    try:
+        with Image.open(io.BytesIO(image_bytes)) as source:
+            oriented = ImageOps.exif_transpose(source)
+            if orientation == "landscape":
+                return oriented.width > oriented.height
+            return oriented.height > oriented.width
+    except (OSError, ValueError, UnidentifiedImageError) as error:
+        raise ServiceError("Immich image could not be processed.") from error
+
+
 def _configuration():
     immich_url = os.environ.get("IMMICH_URL", "").rstrip("/")
     api_key = os.environ.get("IMMICH_API_KEY", "")
@@ -67,7 +79,7 @@ def _response_json(response, operation):
         raise ServiceError(f"Immich {operation} returned invalid JSON.") from error
 
 
-def fetch_random_thumbnail():
+def fetch_random_thumbnail(orientation="both"):
     api_base, api_key = _configuration()
     headers = {"x-api-key": api_key}
     try:
@@ -97,26 +109,38 @@ def fetch_random_thumbnail():
     if not candidates:
         raise ServiceError("Immich returned no images.")
 
-    asset_id = quote(random.choice(candidates)["id"], safe="")
-    try:
-        thumbnail_response = requests.get(
-            f"{api_base}/assets/{asset_id}/thumbnail",
-            params={"size": "preview"},
-            headers=headers,
-            timeout=REQUEST_TIMEOUT,
-        )
-    except requests.RequestException as error:
-        raise ServiceError("Could not download an Immich image thumbnail.") from error
-    try:
-        thumbnail_response.raise_for_status()
-    except requests.RequestException as error:
-        status = getattr(thumbnail_response, "status_code", None)
-        detail = f" (HTTP {status})" if status is not None else ""
-        raise ServiceError(f"Immich thumbnail download failed{detail}.") from error
+    if orientation == "both":
+        candidates = [random.choice(candidates)]
+    else:
+        random.shuffle(candidates)
 
-    if not thumbnail_response.content:
-        raise ServiceError("Immich returned an empty image thumbnail.")
-    return thumbnail_response.content
+    for candidate in candidates:
+        asset_id = quote(candidate["id"], safe="")
+        try:
+            thumbnail_response = requests.get(
+                f"{api_base}/assets/{asset_id}/thumbnail",
+                params={"size": "preview"},
+                headers=headers,
+                timeout=REQUEST_TIMEOUT,
+            )
+        except requests.RequestException as error:
+            raise ServiceError("Could not download an Immich image thumbnail.") from error
+        try:
+            thumbnail_response.raise_for_status()
+        except requests.RequestException as error:
+            status = getattr(thumbnail_response, "status_code", None)
+            detail = f" (HTTP {status})" if status is not None else ""
+            raise ServiceError(f"Immich thumbnail download failed{detail}.") from error
+
+        if not thumbnail_response.content:
+            raise ServiceError("Immich returned an empty image thumbnail.")
+        if orientation == "both" or _matches_orientation(
+            thumbnail_response.content,
+            orientation,
+        ):
+            return thumbnail_response.content
+
+    raise ServiceError(f"Immich returned no {orientation} images.")
 
 
 @app.get("/healthz")
@@ -126,8 +150,12 @@ def health():
 
 @app.get("/image.jpg")
 def image():
+    orientation = request.args.get("orientation", "both")
+    if orientation not in ORIENTATIONS:
+        return jsonify(error="orientation must be landscape, portrait, or both."), 400
+
     try:
-        jpeg_bytes = process_image(fetch_random_thumbnail())
+        jpeg_bytes = process_image(fetch_random_thumbnail(orientation))
     except ServiceError as error:
         app.logger.warning("Image request failed: %s", error)
         status_code = 503 if isinstance(error, ConfigurationError) else 502
