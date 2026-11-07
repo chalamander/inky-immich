@@ -19,37 +19,6 @@ def make_image(size, color, image_format="JPEG", exif=None):
 
 
 class ProcessImageTests(unittest.TestCase):
-    def test_display_preparation_boosts_contrast_color_and_edges(self):
-        grayscale = Image.new("RGB", (100, 10))
-        muted_color = Image.new("RGB", (100, 10))
-        for x in range(100):
-            level = 105 + x // 2
-            grayscale.paste((level, level, level), (x, 0, x + 1, 10))
-            muted_color.paste((level, level - 10, level - 10), (x, 0, x + 1, 10))
-
-        prepared_grayscale = app._prepare_for_display(grayscale)
-        prepared_color = app._prepare_for_display(muted_color)
-        input_contrast = grayscale.getextrema()[0][1] - grayscale.getextrema()[0][0]
-        output_contrast = (
-            prepared_grayscale.getextrema()[0][1] - prepared_grayscale.getextrema()[0][0]
-        )
-        input_saturation = muted_color.getpixel((75, 5))[0] - muted_color.getpixel((75, 5))[1]
-        output_saturation = (
-            prepared_color.getpixel((75, 5))[0] - prepared_color.getpixel((75, 5))[1]
-        )
-        self.assertGreater(output_contrast, input_contrast)
-        self.assertGreater(output_saturation, input_saturation)
-
-        edge = Image.new("RGB", (20, 10), (100, 100, 100))
-        for x in range(10, 20):
-            edge.paste((150, 150, 150), (x, 0, x + 1, 10))
-        prepared_edge = app._prepare_for_display(edge)
-        input_edge = edge.getpixel((10, 5))[0] - edge.getpixel((9, 5))[0]
-        output_edge = (
-            prepared_edge.getpixel((10, 5))[0] - prepared_edge.getpixel((9, 5))[0]
-        )
-        self.assertGreater(output_edge, input_edge)
-
     def test_outputs_jpeg_at_target_size_for_varied_inputs(self):
         cases = [
             ((240, 480), "portrait"),
@@ -63,6 +32,18 @@ class ProcessImageTests(unittest.TestCase):
                     self.assertEqual(output.format, "JPEG")
                     self.assertEqual(output.size, (800, 480))
                     self.assertEqual(output.mode, "RGB")
+
+    def test_preserves_source_colors_without_palette_mapping_or_enhancement(self):
+        source_color = (123, 77, 189)
+        result = app.process_image(make_image((800, 480), source_color))
+
+        with Image.open(io.BytesIO(result)) as output:
+            pixel = output.getpixel((400, 240))
+
+        self.assertLessEqual(
+            max(abs(channel - source) for channel, source in zip(pixel, source_color)),
+            2,
+        )
 
     def test_applies_exif_orientation_before_fit(self):
         pixels = Image.new("RGB", (120, 60), "black")
@@ -80,25 +61,6 @@ class ProcessImageTests(unittest.TestCase):
             self.assertEqual(output.size, (800, 480))
             self.assertEqual(output.getpixel((400, 30))[0], 0)
             self.assertEqual(output.getpixel((400, 450))[0], 255)
-
-    def test_colors_are_quantized_to_target_palette(self):
-        palette = [
-            (0, 0, 0),
-            (255, 255, 255),
-            (160, 32, 32),
-            (240, 224, 80),
-            (96, 128, 80),
-            (80, 128, 184),
-        ]
-        result = app.process_image(make_image((800, 480), (160, 32, 32)))
-
-        with Image.open(io.BytesIO(result)) as output:
-            pixel = output.getpixel((400, 240))
-        distance = min(
-            sum(abs(channel - target) for channel, target in zip(pixel, color))
-            for color in palette
-        )
-        self.assertLessEqual(distance, 8)
 
 
 class EndpointTests(unittest.TestCase):

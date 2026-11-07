@@ -46,15 +46,11 @@ should retrieve and display images from the `/image.jpg` endpoint.
 
 For each request, the service searches Immich for random image assets, selects
 one, and downloads its preview thumbnail. It applies EXIF orientation, a
-centered aspect-preserving crop, resizes to exactly 800×480, then quantizes
-and dithers to `#000000`, `#FFFFFF`, `#A02020`, `#F0E050`, `#608050`, and
-`#5080B8`. The result is encoded as high-quality JPEG with chroma subsampling
-disabled and returned as `image/jpeg`. Before palette mapping, it applies
-subtle contrast and color boosts plus edge sharpening to help photos retain
-definition on the limited e-ink palette. These adjustments are inspired by
-[InkyStream's image-processing approach](https://github.com/8ix/inkystream).
-JPEG compression may slightly alter the palette colors; verify the result on
-the actual frame.
+one, and downloads its preview thumbnail. The service applies EXIF orientation
+and a centered aspect-preserving crop/resize to exactly 800×480. It does not
+apply color enhancement, sharpening, palette quantization, or dithering. The
+image is encoded as JPEG at quality 100 with chroma subsampling disabled to
+preserve source detail as much as JPEG allows, then returned as `image/jpeg`.
 
 Immich or image-processing failures return a JSON error with HTTP 502.
 Missing Immich configuration returns HTTP 503.

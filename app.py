@@ -5,15 +5,14 @@ from urllib.parse import quote
 
 import requests
 from flask import Flask, Response, jsonify
-from PIL import Image, ImageEnhance, ImageFilter, ImageOps, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 app = Flask(__name__)
 
 WIDTH = 800
 HEIGHT = 480
-PALETTE = ("#000000", "#FFFFFF", "#A02020", "#F0E050", "#608050", "#5080B8")
 REQUEST_TIMEOUT = (5, 20)
-JPEG_QUALITY = 95
+JPEG_QUALITY = 100
 
 
 class ServiceError(Exception):
@@ -22,23 +21,6 @@ class ServiceError(Exception):
 
 class ConfigurationError(ServiceError):
     pass
-
-
-def _palette_image():
-    colors = [
-        int(PALETTE[index][offset : offset + 2], 16)
-        for index in range(len(PALETTE))
-        for offset in (1, 3, 5)
-    ]
-    palette = Image.new("P", (1, 1))
-    palette.putpalette(colors + [0] * (768 - len(colors)))
-    return palette
-
-
-def _prepare_for_display(image):
-    image = ImageEnhance.Contrast(image).enhance(1.12)
-    image = ImageEnhance.Color(image).enhance(1.15)
-    return image.filter(ImageFilter.UnsharpMask(radius=1, percent=125, threshold=3))
 
 
 def process_image(image_bytes):
@@ -51,13 +33,8 @@ def process_image(image_bytes):
                 method=Image.Resampling.LANCZOS,
                 centering=(0.5, 0.5),
             )
-        prepared = _prepare_for_display(fitted)
-        quantized = prepared.quantize(
-            palette=_palette_image(),
-            dither=Image.Dither.FLOYDSTEINBERG,
-        )
         output = io.BytesIO()
-        quantized.convert("RGB").save(
+        fitted.save(
             output,
             format="JPEG",
             quality=JPEG_QUALITY,
