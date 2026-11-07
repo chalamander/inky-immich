@@ -97,7 +97,29 @@ def _response_json(response, operation):
         raise ServiceError(f"Immich {operation} returned invalid JSON.") from error
 
 
-def fetch_random_thumbnail(
+def _download_thumbnail(api_base, headers, asset_id):
+    encoded_asset_id = quote(asset_id, safe="")
+    try:
+        thumbnail_response = requests.get(
+            f"{api_base}/assets/{encoded_asset_id}/thumbnail",
+            params={"size": "preview"},
+            headers=headers,
+            timeout=REQUEST_TIMEOUT,
+        )
+    except requests.RequestException as error:
+        raise ServiceError("Could not download an Immich image thumbnail.") from error
+    try:
+        thumbnail_response.raise_for_status()
+    except requests.RequestException as error:
+        status = getattr(thumbnail_response, "status_code", None)
+        detail = f" (HTTP {status})" if status is not None else ""
+        raise ServiceError(f"Immich thumbnail download failed{detail}.") from error
+    if not thumbnail_response.content:
+        raise ServiceError("Immich returned an empty image thumbnail.")
+    return thumbnail_response.content
+
+
+def _find_random_asset(
     orientation="both",
     people=None,
     include_tags=None,
@@ -143,37 +165,102 @@ def fetch_random_thumbnail(
         raise ServiceError("Immich returned no images.")
 
     if orientation == "both":
-        candidates = [random.choice(candidates)]
+        return random.choice(candidates), None, api_base, headers
     else:
         random.shuffle(candidates)
 
     for candidate in candidates:
-        asset_id = quote(candidate["id"], safe="")
-        try:
-            thumbnail_response = requests.get(
-                f"{api_base}/assets/{asset_id}/thumbnail",
-                params={"size": "preview"},
-                headers=headers,
-                timeout=REQUEST_TIMEOUT,
-            )
-        except requests.RequestException as error:
-            raise ServiceError("Could not download an Immich image thumbnail.") from error
-        try:
-            thumbnail_response.raise_for_status()
-        except requests.RequestException as error:
-            status = getattr(thumbnail_response, "status_code", None)
-            detail = f" (HTTP {status})" if status is not None else ""
-            raise ServiceError(f"Immich thumbnail download failed{detail}.") from error
-
-        if not thumbnail_response.content:
-            raise ServiceError("Immich returned an empty image thumbnail.")
-        if orientation == "both" or _matches_orientation(
-            thumbnail_response.content,
-            orientation,
-        ):
-            return thumbnail_response.content
+        thumbnail = _download_thumbnail(api_base, headers, candidate["id"])
+        if _matches_orientation(thumbnail, orientation):
+            return candidate, thumbnail, api_base, headers
 
     raise ServiceError(f"Immich returned no {orientation} images.")
+
+
+def fetch_random_thumbnail(
+    orientation="both",
+    people=None,
+    include_tags=None,
+    exclude_tags=None,
+):
+    asset, thumbnail, api_base, headers = _find_random_asset(
+        orientation,
+        people,
+        include_tags,
+        exclude_tags,
+    )
+    if thumbnail is None:
+        thumbnail = _download_thumbnail(api_base, headers, asset["id"])
+    return thumbnail
+
+
+def _image_filters():
+    return {
+        "people": [
+            person_id.strip()
+            for value in request.args.getlist("people")
+            for person_id in value.split(",")
+            if person_id.strip()
+        ],
+        "include_tags": [
+            tag.strip()
+            for value in request.args.getlist("includeTags")
+            for tag in value.split(",")
+            if tag.strip()
+        ],
+        "exclude_tags": [
+            tag.strip()
+            for value in request.args.getlist("excludeTags")
+            for tag in value.split(",")
+            if tag.strip()
+        ],
+    }
+
+
+def _fetch_asset_album(asset_id, api_base, headers):
+    try:
+        response = requests.get(
+            f"{api_base}/albums",
+            params={"assetId": asset_id},
+            headers=headers,
+            timeout=REQUEST_TIMEOUT,
+        )
+    except requests.RequestException as error:
+        raise ServiceError("Could not connect to Immich for album lookup.") from error
+    albums = _response_json(response, "album lookup")
+    if not isinstance(albums, list):
+        raise ServiceError("Immich album lookup returned an unexpected response.")
+    for album in albums:
+        if isinstance(album, dict) and isinstance(album.get("albumName"), str):
+            return album["albumName"]
+    return ""
+
+
+def _asset_metadata(asset, album, orientation):
+    exif = asset.get("exifInfo")
+    if not isinstance(exif, dict):
+        exif = {}
+    location_parts = [
+        exif.get(field).strip()
+        for field in ("city", "state", "country")
+        if isinstance(exif.get(field), str) and exif[field].strip()
+    ]
+    location = " / ".join(location_parts)
+    if not location:
+        latitude = exif.get("latitude")
+        longitude = exif.get("longitude")
+        if isinstance(latitude, (int, float)) and isinstance(longitude, (int, float)):
+            location = f"{latitude:.4f}/{longitude:.4f}"
+
+    created_at = asset.get("fileCreatedAt")
+    image_date = created_at[:10] if isinstance(created_at, str) else ""
+    return {
+        "assetId": asset["id"],
+        "orientation": orientation,
+        "date": image_date,
+        "location": location,
+        "album": album,
+    }
 
 
 @app.get("/healthz")
@@ -181,37 +268,56 @@ def health():
     return jsonify(status="ok")
 
 
+@app.get("/image-metadata.json")
+def image_metadata():
+    orientation = request.args.get("orientation", "both")
+    if orientation not in ORIENTATIONS:
+        return jsonify(error="orientation must be landscape, portrait, or both."), 400
+
+    try:
+        filters = _image_filters()
+        asset, _, api_base, headers = _find_random_asset(
+            orientation,
+            filters["people"],
+            filters["include_tags"],
+            filters["exclude_tags"],
+        )
+        album = _fetch_asset_album(asset["id"], api_base, headers)
+        return jsonify(_asset_metadata(asset, album, orientation))
+    except ServiceError as error:
+        app.logger.warning("Image metadata request failed: %s", error)
+        status_code = 503 if isinstance(error, ConfigurationError) else 502
+        return jsonify(error=str(error)), status_code
+
+
 @app.get("/image.jpg")
 def image():
     orientation = request.args.get("orientation", "both")
     if orientation not in ORIENTATIONS:
         return jsonify(error="orientation must be landscape, portrait, or both."), 400
-    people = [
-        person_id.strip()
-        for value in request.args.getlist("people")
-        for person_id in value.split(",")
-        if person_id.strip()
-    ]
-    include_tags = [
-        tag.strip()
-        for value in request.args.getlist("includeTags")
-        for tag in value.split(",")
-        if tag.strip()
-    ]
-    exclude_tags = [
-        tag.strip()
-        for value in request.args.getlist("excludeTags")
-        for tag in value.split(",")
-        if tag.strip()
-    ]
 
     try:
-        thumbnail = fetch_random_thumbnail(
-            orientation,
-            people,
-            include_tags,
-            exclude_tags,
-        )
+        asset_id = request.args.get("assetId")
+        if asset_id:
+            api_base, api_key = _configuration()
+            thumbnail = _download_thumbnail(
+                api_base,
+                {"x-api-key": api_key},
+                asset_id,
+            )
+            if orientation != "both" and not _matches_orientation(
+                thumbnail,
+                orientation,
+            ):
+                raise ServiceError(f"Immich returned no {orientation} images.")
+        else:
+            filters = _image_filters()
+            thumbnail = fetch_random_thumbnail(
+                orientation,
+                filters["people"],
+                filters["include_tags"],
+                filters["exclude_tags"],
+            )
         jpeg_bytes = process_image(thumbnail, orientation)
     except ServiceError as error:
         app.logger.warning("Image request failed: %s", error)

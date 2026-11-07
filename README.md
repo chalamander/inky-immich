@@ -4,6 +4,20 @@ A small web service that fetches a random Immich photo and prepares it for an
 800×480 Inky Frame. The frame can request a ready-to-display JPEG from
 `GET /image.jpg`.
 
+## Create an Immich API key
+
+In order to get things started, Create an API key in your Immich installation
+and set the following permissions:
+
+| Permission | Description |
+|---|---|
+| `AssetRead` | Required to search for images and read their thumbnails. |
+| `AlbumRead` | Optional; required to look up album names for the metadata overlay. |
+
+Keep the key out of source control. `IMMICH_URL` is the Immich server origin,
+with no `/api` suffix; the service also accepts a URL that already ends in
+`/api`.
+
 ## Configure and run
 
 Create a `.env` file in this directory (it is ignored by Git):
@@ -13,49 +27,56 @@ IMMICH_URL=http://your-immich-server:2283
 IMMICH_API_KEY=your-immich-api-key
 ```
 
-`IMMICH_URL` is the Immich server origin, with no `/api` suffix. The service
-also accepts a URL that already ends in `/api`. Create an API key in Immich
-with permission to search and read assets. Keep the key out of source control.
-
 Start the service with Docker Compose:
 
 ```sh
 docker compose up --build -d
 ```
 
-The service listens on host port `18765` (container port `8000`); request
-`http://your-service-host:18765/image.jpg`. Set `IMAGE_URL` in
-[`immich_inky_frame.py`](./immich_inky_frame.py) to this address, replacing the
-default host if needed. The container health check uses a separate `/healthz`
-endpoint and does not make extra requests to Immich.
+## Configure image selection
 
-The `/image.jpg` endpoint accepts an optional `orientation` query parameter:
-`landscape`, `portrait`, or `both`. It defaults to `both`; for example,
-`http://your-service-host:18765/image.jpg?orientation=portrait` returns a
-portrait source image rotated 90° clockwise for a screen mounted at -90°.
-Images are returned at 800×480; `both` preserves the default behavior. If
-Immich's random results have no image in the requested orientation, the
-endpoint returns an error.
+The service listens on host port `18765` (container port `8000`). The frame
+requests images from `http://your-service-host:18765/image.jpg`. This endpoint
+accepts the following optional query parameters:
 
-It also accepts an optional `people` query parameter with one or more Immich
-person IDs. Use commas or repeated parameters to specify multiple people;
-results matching any of those people are eligible. For example:
-`http://your-service-host:18765/image.jpg?people=id1,id2`.
+| Parameter | Description |
+|---|---|
+| `orientation` | Select `landscape`, `portrait`, or `both` images. Defaults to `both`. Portrait images are rotated for a screen mounted at -90°. |
+| `people` | Filter to images containing any of the specified Immich person IDs. Supply multiple IDs as a comma-separated list or repeat the parameter. |
+| `includeTags` | Include images matching any of the specified Immich tag IDs. Accepts comma-separated IDs or repeated parameters. |
+| `excludeTags` | Exclude images matching any of the specified Immich tag IDs. Accepts comma-separated IDs or repeated parameters. |
+| `showMetadata` | Set to `true` to enable the Inky Frame metadata overlay. Defaults to `false`; metadata includes the capture date, location, and first album when available. |
 
-Use `includeTags` to restrict results to images matching any listed tag, or
-`excludeTags` to omit images matching any listed tag. Supply Immich tag IDs
-as comma-separated values or repeated parameters. For example:
-`http://your-service-host:18765/image.jpg?includeTags=tag1,tag2&excludeTags=tag3`.
-Both parameters can be used together.
+For example, `http://your-service-host:18765/image.jpg?orientation=portrait`
+returns a portrait source image rotated 90° clockwise for a screen mounted at
+-90°. Multiple people or tags can be supplied as comma-separated values or by
+repeating the parameter. The `people` filter matches any listed person;
+`includeTags` and `excludeTags` can be combined. If there are no images in the
+requested orientation, the endpoint returns an error. Images are returned at
+800×480.
 
-## Getting a person’s ID from Immich
+The container health check uses a separate `/healthz` endpoint and does not
+make extra requests to Immich.
+
+## Get a person’s ID from Immich
 
 1. Open Immich’s web interface and click on “Explore” in the left-hand navigation.
 2. Click on the person you want the ID of (you may have to click “view all” if you don’t see them).
-3. The URL will now look something like this:
+3. The URL will look something like this:
    `http://192.168.86.123:2283/people/a04175f4-97bb-4d97-8d49-3700263043e5`.
 4. The person’s ID is everything after `people/`; in this example:
    `a04175f4-97bb-4d97-8d49-3700263043e5`.
+
+## Image metadata overlay
+
+Metadata display is off by default. To enable it, add
+`showMetadata=true` in the image URL. When enabled, the frame requests the
+selected image's metadata and then fetches that same image, so the displayed
+details match the photo. The bottom of the screen shows the capture date,
+location, and first album name (when available), separated by commas. Missing
+details are omitted. Album names require the API key's `AlbumRead` permission.
+The metadata endpoint uses the same orientation, people, and tag filters as
+`/image.jpg`.
 
 ## Set up the Inky Frame
 
@@ -65,7 +86,8 @@ and copy/save it to the Inky Frame.
 
 Before copying the script, change `IMAGE_URL` in the Python file to the
 `/image.jpg` URL for the server running inky-immich, for example
-`http://your-service-host:18765/image.jpg`.
+`http://your-service-host:18765/image.jpg`. Add any query parameters from
+[Configure image selection](#configure-image-selection) that you want to use.
 
 Once the script is on the device and the web server is running, the Inky Frame
 should retrieve and display images from the `/image.jpg` endpoint. If a

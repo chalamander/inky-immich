@@ -200,6 +200,82 @@ class EndpointTests(unittest.TestCase):
         )
 
     @patch.dict(os.environ, {"IMMICH_URL": "http://immich:2283", "IMMICH_API_KEY": "test-key"})
+    @patch("app.requests.get")
+    @patch("app.requests.post")
+    def test_metadata_endpoint_returns_date_location_and_first_album(
+        self,
+        mock_post,
+        mock_get,
+    ):
+        asset_id = "a04175f4-97bb-4d97-8d49-3700263043e5"
+        mock_post.return_value.json.return_value = [{
+            "id": asset_id,
+            "fileCreatedAt": "2024-05-06T12:30:00.000Z",
+            "exifInfo": {
+                "city": "London",
+                "state": "Greater London",
+                "country": "United Kingdom",
+            },
+        }]
+        mock_get.side_effect = [
+            Mock(content=make_image((300, 500), (120, 130, 140))),
+            Mock(json=Mock(return_value=[
+                {"albumName": "First album"},
+                {"albumName": "Second album"},
+            ])),
+        ]
+
+        response = self.client.get("/image-metadata.json?orientation=portrait")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.get_json(),
+            {
+                "assetId": asset_id,
+                "orientation": "portrait",
+                "date": "2024-05-06",
+                "location": "London / Greater London / United Kingdom",
+                "album": "First album",
+            },
+        )
+        self.assertEqual(mock_get.call_args_list[1].args[0], "http://immich:2283/api/albums")
+        self.assertEqual(
+            mock_get.call_args_list[1].kwargs["params"],
+            {"assetId": asset_id},
+        )
+
+    @patch.dict(os.environ, {"IMMICH_URL": "http://immich:2283", "IMMICH_API_KEY": "test-key"})
+    @patch("app.requests.get")
+    @patch("app.requests.post")
+    def test_image_endpoint_can_fetch_metadata_selected_asset(self, mock_post, mock_get):
+        asset_id = "a04175f4-97bb-4d97-8d49-3700263043e5"
+        mock_get.return_value.content = make_image((400, 300), (120, 130, 140))
+
+        response = self.client.get(f"/image.jpg?assetId={asset_id}")
+
+        self.assertEqual(response.status_code, 200)
+        mock_post.assert_not_called()
+        self.assertEqual(
+            mock_get.call_args.args[0],
+            f"http://immich:2283/api/assets/{asset_id}/thumbnail",
+        )
+
+    @patch.dict(os.environ, {"IMMICH_URL": "http://immich:2283", "IMMICH_API_KEY": "test-key"})
+    @patch("app.requests.get")
+    @patch("app.requests.post")
+    def test_selected_asset_respects_orientation_filter(self, mock_post, mock_get):
+        asset_id = "a04175f4-97bb-4d97-8d49-3700263043e5"
+        mock_get.return_value.content = make_image((400, 300), (120, 130, 140))
+
+        response = self.client.get(
+            f"/image.jpg?assetId={asset_id}&orientation=portrait"
+        )
+
+        self.assertEqual(response.status_code, 502)
+        self.assertIn("no portrait images", response.get_json()["error"])
+        mock_post.assert_not_called()
+
+    @patch.dict(os.environ, {"IMMICH_URL": "http://immich:2283", "IMMICH_API_KEY": "test-key"})
     @patch("app.random.shuffle")
     @patch("app.requests.get")
     @patch("app.requests.post")
