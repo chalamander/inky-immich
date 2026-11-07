@@ -42,14 +42,15 @@ class ProcessImageTests(unittest.TestCase):
 
         self.assertGreater(pixel[2] - pixel[0], source_color[2] - source_color[0])
 
-    def test_gamma_correction_brightens_midtones(self):
+    def test_brightness_and_gamma_correction_brighten_midtones(self):
         source_color = (100, 100, 100)
         result = app.process_image(make_image((800, 480), source_color))
 
         with Image.open(io.BytesIO(result)) as output:
             pixel = output.getpixel((400, 240))
 
-        self.assertGreater(pixel[0], source_color[0])
+        expected = round(255 * ((source_color[0] / 255) * app.BRIGHTNESS_FACTOR) ** app.GAMMA)
+        self.assertAlmostEqual(pixel[0], expected, delta=2)
         self.assertLessEqual(max(pixel) - min(pixel), 2)
 
     def test_applies_exif_orientation_before_fit(self):

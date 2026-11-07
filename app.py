@@ -14,7 +14,8 @@ HEIGHT = 480
 REQUEST_TIMEOUT = (5, 20)
 JPEG_QUALITY = 100
 SATURATION_FACTOR = 1.3
-GAMMA = 0.9
+BRIGHTNESS_FACTOR = 1.1
+GAMMA = 0.8
 GAMMA_LUT = [round(255 * (value / 255) ** GAMMA) for value in range(256)] * 3
 ORIENTATIONS = {"landscape", "portrait", "both"}
 
@@ -40,7 +41,8 @@ def process_image(image_bytes, orientation="both"):
                 centering=(0.5, 0.5),
             )
             saturated = ImageEnhance.Color(fitted).enhance(SATURATION_FACTOR)
-            enhanced = saturated.point(GAMMA_LUT)
+            brightened = ImageEnhance.Brightness(saturated).enhance(BRIGHTNESS_FACTOR)
+            enhanced = brightened.point(GAMMA_LUT)
         output = io.BytesIO()
         enhanced.save(
             output,
