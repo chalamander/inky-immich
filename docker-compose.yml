@@ -1,5 +1,6 @@
 services:
   inky-immich:
+    container_name: inky-immich
     build: .
     ports:
       - "18765:8000"
