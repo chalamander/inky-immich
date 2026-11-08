@@ -97,9 +97,9 @@ for the frame. To turn it off, change it to `showMetadata=false` or remove the
 with a Docker Compose environment variable. When enabled, the frame requests the
 selected image's metadata and then fetches that same image, so the displayed
 details match the photo. The bottom of the screen shows the capture date,
-location, and first album name (when available). The album name is
-right-aligned; the date and location remain left-aligned. Missing details are
-omitted. Dates use an ordinal day and written month, e.g.
+location, and first album name (when available), in that order and separated
+by commas. Text does not wrap; long metadata is truncated to fit. Missing
+details are omitted. Dates use an ordinal day and written month, e.g.
 `6th May 2024`. Emoji characters are removed from album titles before display.
 Album names require the API key's `AlbumRead` permission.
 The metadata endpoint uses the same orientation, people, and tag filters as
