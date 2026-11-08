@@ -2,6 +2,7 @@ import io
 import os
 import random
 from datetime import date
+from uuid import UUID
 from urllib.parse import quote
 
 import regex
@@ -182,6 +183,67 @@ def _download_thumbnail(api_base, headers, asset_id):
     return thumbnail_response.content
 
 
+def _is_tag_id(value):
+    try:
+        tag_id = UUID(value)
+    except ValueError:
+        return False
+    return tag_id.version == 4 and str(tag_id) == value.lower()
+
+
+def _resolve_tag_filters(include_tags, exclude_tags, api_base, headers):
+    requested_tags = include_tags + exclude_tags
+    names = [tag for tag in requested_tags if not _is_tag_id(tag)]
+    if not names:
+        return include_tags, exclude_tags
+
+    try:
+        tags_response = requests.get(
+            f"{api_base}/tags",
+            headers=headers,
+            timeout=REQUEST_TIMEOUT,
+        )
+    except requests.RequestException as error:
+        raise ServiceError("Could not connect to Immich for tag lookup.") from error
+
+    tags = _response_json(tags_response, "tag lookup")
+    if not isinstance(tags, list):
+        raise ServiceError("Immich tag lookup returned an unexpected response.")
+
+    def resolve(tag_value):
+        if _is_tag_id(tag_value):
+            return tag_value
+
+        full_path_matches = {
+            tag["id"]
+            for tag in tags
+            if isinstance(tag, dict)
+            and tag.get("value") == tag_value
+            and isinstance(tag.get("id"), str)
+        }
+        matches = full_path_matches or {
+            tag["id"]
+            for tag in tags
+            if isinstance(tag, dict)
+            and tag.get("name") == tag_value
+            and isinstance(tag.get("id"), str)
+        }
+        if not matches:
+            raise ServiceError(
+                f"Immich tag '{tag_value}' was not found. Use an exact tag name or ID."
+            )
+        if len(matches) > 1:
+            raise ServiceError(
+                f"Immich tag name '{tag_value}' is ambiguous. Use its full path or ID."
+            )
+        return next(iter(matches))
+
+    return (
+        [resolve(tag) for tag in include_tags],
+        [resolve(tag) for tag in exclude_tags],
+    )
+
+
 def _find_random_asset(
     orientation="both",
     people=None,
@@ -194,6 +256,12 @@ def _find_random_asset(
     search_filter: dict[str, object] = {"type": {"eq": "IMAGE"}}
     if people:
         search_filter["personIds"] = {"any": people}
+    include_tags, exclude_tags = _resolve_tag_filters(
+        include_tags or [],
+        exclude_tags or [],
+        api_base,
+        headers,
+    )
     tag_filter: dict[str, object] = {}
     if include_tags:
         tag_filter["any"] = include_tags

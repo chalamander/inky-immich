@@ -12,6 +12,7 @@ and set the following permissions:
 | Permission | Description |
 |---|---|
 | `AssetRead` | Required to search for images and read their thumbnails. |
+| `TagRead` | Optional; required when using tag names in `includeTags` or `excludeTags`. |
 | `AlbumRead` | Optional; required to look up album names for the metadata overlay. |
 
 Keep the key out of source control. `IMMICH_URL` is the Immich server origin,
@@ -28,10 +29,10 @@ IMMICH_API_KEY=your-immich-api-key
 # Optional image-selection defaults:
 ORIENTATION=both
 EXCLUDE_DARKER_IMAGES=false
-# Optional filters; replace with IDs from your Immich installation:
+# Optional filters; use tag names or IDs from your Immich installation:
 # PEOPLE=person-id-1,person-id-2
-# INCLUDE_TAGS=tag-id-1,tag-id-2
-# EXCLUDE_TAGS=tag-id-3
+# INCLUDE_TAGS=Family,Vacation
+# EXCLUDE_TAGS=kiosk-skip
 ```
 
 The optional variables set server-wide defaults for the corresponding image
@@ -39,8 +40,8 @@ URL parameters. A URL parameter takes precedence over its environment variable;
 for list parameters, specifying the URL parameter replaces the full list from
 the environment. Lists in `.env` use comma-separated values. `PEOPLE`,
 `INCLUDE_TAGS`, and `EXCLUDE_TAGS` are intentionally omitted and unset by
-default; set them only when you want to filter using IDs from your Immich
-installation. `showMetadata` is the exception: it is controlled only by the
+default; set them only when you want to filter using tag names or IDs from
+your Immich installation. `showMetadata` is the exception: it is controlled only by the
 URL query parameter and has no environment-variable setting.
 
 Start the service with Docker Compose:
@@ -59,8 +60,8 @@ accepts the following optional query parameters:
 |---|---|
 | `orientation` | Select `landscape`, `portrait`, or `both` images. Defaults to `ORIENTATION`, then `both`. Portrait images are rotated for a screen mounted at -90°. |
 | `people` | Filter to images containing any of the specified Immich person IDs. Supply multiple IDs as a comma-separated list or repeat the parameter. Overrides `PEOPLE`. |
-| `includeTags` | Include images matching any of the specified Immich tag IDs. Accepts comma-separated IDs or repeated parameters. Overrides `INCLUDE_TAGS`. |
-| `excludeTags` | Exclude images matching any of the specified Immich tag IDs. Accepts comma-separated IDs or repeated parameters. Overrides `EXCLUDE_TAGS`. |
+| `includeTags` | Include images matching any of the specified Immich tag names or IDs. Accepts comma-separated values or repeated parameters. Tag names are matched exactly; use a full path for nested tags with duplicate names. Name lookup requires the API key's `TagRead` permission. Overrides `INCLUDE_TAGS`. |
+| `excludeTags` | Exclude images matching any of the specified Immich tag names or IDs. Accepts comma-separated values or repeated parameters. Tag names are matched exactly; use a full path for nested tags with duplicate names. Name lookup requires the API key's `TagRead` permission. Overrides `EXCLUDE_TAGS`. |
 | `excludeDarkerImages` | Set to `true` to skip images whose average grayscale brightness is below 80/255. Defaults to `EXCLUDE_DARKER_IMAGES`, then `false`. |
 | `showMetadata` | Set to `true` to enable the Inky Frame metadata overlay. This URL-only parameter defaults to `false`; metadata includes the capture date, location, and first album when available. |
 

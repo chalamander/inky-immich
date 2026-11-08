@@ -214,8 +214,11 @@ class EndpointTests(unittest.TestCase):
         "IMMICH_API_KEY": "test-key",
         "ORIENTATION": "portrait",
         "PEOPLE": "person-1, person-2",
-        "INCLUDE_TAGS": "include-1,include-2",
-        "EXCLUDE_TAGS": "exclude-1",
+        "INCLUDE_TAGS": (
+            "a04175f4-97bb-4d97-8d49-3700263043e5,"
+            "b04175f4-97bb-4d97-8d49-3700263043e5"
+        ),
+        "EXCLUDE_TAGS": "c04175f4-97bb-4d97-8d49-3700263043e5",
         "EXCLUDE_DARKER_IMAGES": "false",
     }, clear=True)
     @patch("app.requests.get")
@@ -238,7 +241,13 @@ class EndpointTests(unittest.TestCase):
                 "filter": {
                     "type": {"eq": "IMAGE"},
                     "personIds": {"any": ["person-1", "person-2"]},
-                    "tagIds": {"any": ["include-1", "include-2"], "none": ["exclude-1"]},
+                    "tagIds": {
+                        "any": [
+                            "a04175f4-97bb-4d97-8d49-3700263043e5",
+                            "b04175f4-97bb-4d97-8d49-3700263043e5",
+                        ],
+                        "none": ["c04175f4-97bb-4d97-8d49-3700263043e5"],
+                    },
                 },
             },
         )
@@ -248,8 +257,8 @@ class EndpointTests(unittest.TestCase):
         "IMMICH_API_KEY": "test-key",
         "ORIENTATION": "portrait",
         "PEOPLE": "environment-person",
-        "INCLUDE_TAGS": "environment-include",
-        "EXCLUDE_TAGS": "environment-exclude",
+        "INCLUDE_TAGS": "a04175f4-97bb-4d97-8d49-3700263043e5",
+        "EXCLUDE_TAGS": "b04175f4-97bb-4d97-8d49-3700263043e5",
         "EXCLUDE_DARKER_IMAGES": "true",
     }, clear=True)
     @patch("app.requests.get")
@@ -264,7 +273,8 @@ class EndpointTests(unittest.TestCase):
 
         response = self.client.get(
             "/image.jpg?orientation=both&people=url-person"
-            "&includeTags=url-include&excludeTags=url-exclude"
+            "&includeTags=c04175f4-97bb-4d97-8d49-3700263043e5"
+            "&excludeTags=d04175f4-97bb-4d97-8d49-3700263043e5"
             "&excludeDarkerImages=false"
         )
 
@@ -276,7 +286,10 @@ class EndpointTests(unittest.TestCase):
                 "filter": {
                     "type": {"eq": "IMAGE"},
                     "personIds": {"any": ["url-person"]},
-                    "tagIds": {"any": ["url-include"], "none": ["url-exclude"]},
+                    "tagIds": {
+                        "any": ["c04175f4-97bb-4d97-8d49-3700263043e5"],
+                        "none": ["d04175f4-97bb-4d97-8d49-3700263043e5"],
+                    },
                 },
             },
         )
@@ -319,6 +332,59 @@ class EndpointTests(unittest.TestCase):
                 },
             },
         )
+
+    @patch.dict(os.environ, {"IMMICH_URL": "http://immich:2283", "IMMICH_API_KEY": "test-key"})
+    @patch("app.requests.get")
+    @patch("app.requests.post")
+    def test_tag_names_are_resolved_to_ids_before_random_search(
+        self,
+        mock_post,
+        mock_get,
+    ):
+        include_id = "a04175f4-97bb-4d97-8d49-3700263043e5"
+        exclude_id = "b04175f4-97bb-4d97-8d49-3700263043e5"
+        tags_response = Mock()
+        tags_response.json.return_value = [
+            {"id": include_id, "name": "Family", "value": "Family"},
+            {"id": exclude_id, "name": "kiosk-skip", "value": "kiosk-skip"},
+        ]
+        thumbnail_response = Mock(content=make_image((400, 300), (120, 130, 140)))
+        mock_get.side_effect = [tags_response, thumbnail_response]
+        mock_post.return_value.json.return_value = [{"id": "asset-id"}]
+
+        response = self.client.get(
+            "/image.jpg?includeTags=Family&excludeTags=kiosk-skip"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            mock_get.call_args_list[0].args[0],
+            "http://immich:2283/api/tags",
+        )
+        self.assertEqual(
+            mock_post.call_args.kwargs["json"],
+            {
+                "size": 20,
+                "filter": {
+                    "type": {"eq": "IMAGE"},
+                    "tagIds": {"any": [include_id], "none": [exclude_id]},
+                },
+            },
+        )
+
+    @patch.dict(os.environ, {"IMMICH_URL": "http://immich:2283", "IMMICH_API_KEY": "test-key"})
+    @patch("app.requests.get")
+    @patch("app.requests.post")
+    def test_unknown_tag_name_returns_clear_error(self, mock_post, mock_get):
+        tags_response = Mock()
+        tags_response.json.return_value = []
+        mock_get.return_value = tags_response
+
+        response = self.client.get("/image.jpg?excludeTags=kiosk-skip")
+
+        self.assertEqual(response.status_code, 502)
+        self.assertIn("tag 'kiosk-skip' was not found", response.get_json()["error"])
+        mock_post.assert_not_called()
 
     @patch.dict(os.environ, {"IMMICH_URL": "http://immich:2283", "IMMICH_API_KEY": "test-key"})
     @patch("app.random.shuffle", side_effect=lambda candidates: None)
