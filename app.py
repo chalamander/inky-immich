@@ -22,6 +22,8 @@ CONTRAST_FACTOR = 1.1
 MINIMUM_AVERAGE_BRIGHTNESS = 80
 GAMMA_LUT = [round(255 * (value / 255) ** GAMMA) for value in range(256)]
 ORIENTATIONS = {"landscape", "portrait", "both"}
+DEFAULT_ORIENTATION = "landscape"
+DEFAULT_EXCLUDE_DARKER_IMAGES = True
 EMOJI_BASE_PATTERN = (
     r"(?:\p{Emoji_Presentation}\uFE0F?"
     r"|\p{Extended_Pictographic}\uFE0F)"
@@ -101,7 +103,11 @@ def _matches_minimum_brightness(image_bytes):
         raise ServiceError("Immich image could not be processed.") from error
 
 
-def _boolean_query_or_environment(name, environment_name, default=False):
+def _boolean_query_or_environment(
+    name,
+    environment_name,
+    default=DEFAULT_EXCLUDE_DARKER_IMAGES,
+):
     value = _query_or_environment(name, environment_name)
     return _parse_boolean_value(name, value, default)
 
@@ -245,11 +251,11 @@ def _resolve_tag_filters(include_tags, exclude_tags, api_base, headers):
 
 
 def _find_random_asset(
-    orientation="both",
+    orientation=DEFAULT_ORIENTATION,
     people=None,
     include_tags=None,
     exclude_tags=None,
-    exclude_darker_images=False,
+    exclude_darker_images=DEFAULT_EXCLUDE_DARKER_IMAGES,
 ):
     api_base, api_key = _configuration()
     headers = {"x-api-key": api_key}
@@ -323,11 +329,11 @@ def _find_random_asset(
 
 
 def fetch_random_thumbnail(
-    orientation="both",
+    orientation=DEFAULT_ORIENTATION,
     people=None,
     include_tags=None,
     exclude_tags=None,
-    exclude_darker_images=False,
+    exclude_darker_images=DEFAULT_EXCLUDE_DARKER_IMAGES,
 ):
     asset, thumbnail, api_base, headers = _find_random_asset(
         orientation,
@@ -430,7 +436,11 @@ def image_metadata():
             "showMetadata",
             request.args.get("showMetadata"),
         )
-        orientation = _query_or_environment("orientation", "ORIENTATION", "both")
+        orientation = _query_or_environment(
+            "orientation",
+            "ORIENTATION",
+            DEFAULT_ORIENTATION,
+        )
     except ValueError as error:
         return jsonify(error=str(error)), 400
 
@@ -465,7 +475,11 @@ def image_metadata():
 @app.get("/image.jpg")
 def image():
     try:
-        orientation = _query_or_environment("orientation", "ORIENTATION", "both")
+        orientation = _query_or_environment(
+            "orientation",
+            "ORIENTATION",
+            DEFAULT_ORIENTATION,
+        )
     except ValueError as error:
         return jsonify(error=str(error)), 400
 

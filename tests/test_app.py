@@ -181,6 +181,39 @@ class EndpointTests(unittest.TestCase):
         )
         self.assertEqual(mock_get.call_args.kwargs["params"], {"size": "preview"})
 
+    @patch.dict(os.environ, {
+        "IMMICH_URL": "http://immich:2283",
+        "IMMICH_API_KEY": "test-key",
+    }, clear=True)
+    @patch("app.random.shuffle", side_effect=lambda candidates: None)
+    @patch("app.requests.get")
+    @patch("app.requests.post")
+    def test_default_filters_to_landscape_and_excludes_dark_images(
+        self,
+        mock_post,
+        mock_get,
+        _mock_shuffle,
+    ):
+        mock_post.return_value.json.return_value = [
+            {"id": "dark-landscape"},
+            {"id": "bright-portrait"},
+            {"id": "bright-landscape"},
+        ]
+        mock_get.side_effect = [
+            Mock(content=make_image((80, 60), (45, 45, 45))),
+            Mock(content=make_image((60, 80), (120, 120, 120))),
+            Mock(content=make_image((80, 60), (120, 120, 120))),
+        ]
+
+        response = self.client.get("/image.jpg")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(mock_get.call_count, 3)
+        self.assertIn(
+            "/assets/bright-landscape/thumbnail",
+            mock_get.call_args.args[0],
+        )
+
     @patch.dict(os.environ, {"IMMICH_URL": "http://immich:2283", "IMMICH_API_KEY": "test-key"})
     @patch("app.requests.get")
     @patch("app.requests.post")
@@ -474,7 +507,7 @@ class EndpointTests(unittest.TestCase):
                 "assetId": asset_id,
                 "orientation": "portrait",
                 "showMetadata": True,
-                "excludeDarkerImages": False,
+                "excludeDarkerImages": True,
                 "date": "6th May 2024",
                 "location": "London / Greater London / United Kingdom",
                 "album": "First album",
@@ -557,7 +590,9 @@ class EndpointTests(unittest.TestCase):
             Mock(content=make_image((500, 300), (40, 50, 60))),
         ]
 
-        response = self.client.get("/image.jpg?orientation=landscape")
+        response = self.client.get(
+            "/image.jpg?orientation=landscape&excludeDarkerImages=false"
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(mock_get.call_count, 2)
@@ -570,7 +605,9 @@ class EndpointTests(unittest.TestCase):
         mock_post.return_value.json.return_value = [{"id": "portrait"}]
         mock_get.return_value.content = make_image((300, 500), (10, 20, 30))
 
-        response = self.client.get("/image.jpg?orientation=portrait")
+        response = self.client.get(
+            "/image.jpg?orientation=portrait&excludeDarkerImages=false"
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("/assets/portrait/thumbnail", mock_get.call_args.args[0])
@@ -590,7 +627,9 @@ class EndpointTests(unittest.TestCase):
         mock_post.return_value.json.return_value = [{"id": "landscape"}]
         mock_get.return_value.content = make_image((500, 300), (40, 50, 60))
 
-        response = self.client.get("/image.jpg?orientation=portrait")
+        response = self.client.get(
+            "/image.jpg?orientation=portrait&excludeDarkerImages=false"
+        )
 
         self.assertEqual(response.status_code, 502)
         self.assertIn("no portrait images", response.get_json()["error"])

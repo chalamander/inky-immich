@@ -28,8 +28,8 @@ IMMICH_URL=http://your-immich-server:2283
 IMMICH_API_KEY=your-immich-api-key
 HOST_IP=your-docker-host-ip
 # Optional image-selection defaults:
-ORIENTATION=both
-EXCLUDE_DARKER_IMAGES=false
+ORIENTATION=landscape
+EXCLUDE_DARKER_IMAGES=true
 # Optional filters; use tag names or IDs from your Immich installation:
 # PEOPLE=person-id-1,person-id-2
 # INCLUDE_TAGS=Family,Vacation
@@ -83,14 +83,14 @@ The service listens on host port `18765` (container port `8000`). The frame
 requests images from `http://your-service-host:18765/image.jpg`. This endpoint
 accepts the following optional query parameters:
 
-| Parameter | Description |
-|---|---|
-| `orientation` | Select `landscape`, `portrait`, or `both` images. Defaults to `ORIENTATION`, then `both`. Portrait images are rotated for a screen mounted at -90°. |
-| `people` | Filter to images containing any of the specified Immich person IDs. Supply multiple IDs as a comma-separated list or repeat the parameter. Overrides `PEOPLE`. |
-| `includeTags` | Include images matching any of the specified Immich tag names or IDs. Accepts comma-separated values or repeated parameters. Tag names are matched exactly; use a full path for nested tags with duplicate names. Name lookup requires the API key's `Tag.Read` permission. Overrides `INCLUDE_TAGS`. |
-| `excludeTags` | Exclude images matching any of the specified Immich tag names or IDs. Accepts comma-separated values or repeated parameters. Tag names are matched exactly; use a full path for nested tags with duplicate names. Name lookup requires the API key's `Tag.Read` permission. Overrides `EXCLUDE_TAGS`. |
-| `excludeDarkerImages` | Set to `true` to skip images whose average grayscale brightness is below 80/255. Defaults to `EXCLUDE_DARKER_IMAGES`, then `false`. |
-| `showMetadata` | Set to `true` to enable the Inky Frame metadata overlay. This URL-only parameter defaults to `false`; metadata includes the capture date, location, and first album when available. |
+| Parameter | Description | Default |
+|---|---|---|
+| `orientation` | Select `landscape`, `portrait`, or `both` images. Portrait images are rotated for a screen mounted at -90°. | `ORIENTATION`, then `landscape` |
+| `people` | Filter to images containing any of the specified Immich person IDs. Supply multiple IDs as a comma-separated list or repeat the parameter. Overrides `PEOPLE`. | None |
+| `includeTags` | Include images matching any of the specified Immich tag names or IDs. Accepts comma-separated values or repeated parameters. Tag names are matched exactly; use a full path for nested tags with duplicate names. Name lookup requires the API key's `Tag.Read` permission. Overrides `INCLUDE_TAGS`. | None |
+| `excludeTags` | Exclude images matching any of the specified Immich tag names or IDs. Accepts comma-separated values or repeated parameters. Tag names are matched exactly; use a full path for nested tags with duplicate names. Name lookup requires the API key's `Tag.Read` permission. Overrides `EXCLUDE_TAGS`. | None |
+| `excludeDarkerImages` | Set to `true` to skip images whose average grayscale brightness is below 80/255. | `EXCLUDE_DARKER_IMAGES`, then `true` |
+| `showMetadata` | Set to `true` to enable the Inky Frame metadata overlay. This URL-only parameter includes the capture date, location, and first album when available. | `false` |
 
 For example, `http://your-service-host:18765/image.jpg?orientation=portrait`
 returns a portrait source image rotated 90° clockwise for a screen mounted at
@@ -99,7 +99,7 @@ repeating the parameter. The `people` filter matches any listed person;
 `includeTags` and `excludeTags` can be combined. If there are no images in the
 requested orientation, the endpoint returns an error. Images are returned at
 800×480.
-When `excludeDarkerImages=true`, the service checks candidate preview
+When `excludeDarkerImages=true` (the default), the service checks candidate preview
 thumbnails and skips any with average grayscale brightness below 80/255.
 
 The container health check uses a separate `/healthz` endpoint and does not
