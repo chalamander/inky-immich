@@ -8,7 +8,7 @@ A small web service that fetches a random Immich photo and prepares it for an
 
 ## Create an Immich API key
 
-In order to get things started, Create an API key in your Immich installation
+In order to get things started, create an API key in your Immich installation
 and set the following permissions:
 
 | Permission | Description |
