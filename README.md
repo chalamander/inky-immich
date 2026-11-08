@@ -50,6 +50,10 @@ Start the service with Docker Compose:
 docker compose up --build -d
 ```
 
+Docker Compose publishes the service on `your-service-host:18765`. This address
+must be assigned to the Docker host; update the `ports` binding in
+`docker-compose.yml` if the host's LAN address changes.
+
 ## Configure image selection
 
 The service listens on host port `18765` (container port `8000`). The frame
