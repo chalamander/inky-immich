@@ -26,6 +26,7 @@ Create a `.env` file in this directory (it is ignored by Git):
 ```dotenv
 IMMICH_URL=http://your-immich-server:2283
 IMMICH_API_KEY=your-immich-api-key
+HOST_IP=your-docker-host-ip
 # Optional image-selection defaults:
 ORIENTATION=both
 EXCLUDE_DARKER_IMAGES=false
@@ -38,7 +39,8 @@ EXCLUDE_DARKER_IMAGES=false
 The optional variables set server-wide defaults for the corresponding image
 URL parameters. A URL parameter takes precedence over its environment variable;
 for list parameters, specifying the URL parameter replaces the full list from
-the environment. Lists in `.env` use comma-separated values. `PEOPLE`,
+the environment. Set `HOST_IP` to the Docker host's LAN address before starting
+the service. Lists in `.env` use comma-separated values. `PEOPLE`,
 `INCLUDE_TAGS`, and `EXCLUDE_TAGS` are intentionally omitted and unset by
 default; set them only when you want to filter using tag names or IDs from
 your Immich installation. `showMetadata` is the exception: it is controlled only by the
@@ -50,9 +52,8 @@ Start the service with Docker Compose:
 docker compose up --build -d
 ```
 
-Docker Compose publishes the service on `your-service-host:18765`. This address
-must be assigned to the Docker host; update the `ports` binding in
-`docker-compose.yml` if the host's LAN address changes.
+Docker Compose binds port `18765` only on the address set by `HOST_IP`. Update
+that value if the Docker host's LAN address changes.
 
 ## Configure image selection
 

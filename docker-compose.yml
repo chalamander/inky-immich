@@ -3,7 +3,7 @@ services:
     container_name: inky-immich
     build: .
     ports:
-      # Change this IP to the Docker host's local network address.
+      # Set HOST_IP in .env to the Docker host's local network address.
       - "${HOST_IP:?Set HOST_IP to Docker host LAN IP}:18765:8000"
     environment:
       IMMICH_URL: ${IMMICH_URL:?Set IMMICH_URL in your environment or .env file}
