@@ -1,5 +1,7 @@
 # inky-immich
 
+![Inky Immich displayed on an Inky Frame](assets/inky-immich-frame.jpg)
+
 A small web service that fetches a random Immich photo and prepares it for an
 800×480 Inky Frame. The frame can request a ready-to-display JPEG from
 `GET /image.jpg`.
