@@ -106,9 +106,16 @@ class FrameRetryTests(unittest.TestCase):
         metadata_response.close.assert_called_once()
         response.close.assert_called_once()
 
-    def test_metadata_is_off_by_default(self):
+    def test_metadata_is_enabled_by_default(self):
         frame, urequest = load_frame_module()
-        settings_response = types.SimpleNamespace(metadata={"showMetadata": False})
+        settings_response = types.SimpleNamespace(
+            metadata={
+                "showMetadata": True,
+                "assetId": "asset-id",
+                "orientation": "both",
+                "excludeDarkerImages": False,
+            }
+        )
         settings_response.close = Mock()
         response = types.SimpleNamespace()
         payload = bytearray(b"\xff\xd8")
@@ -131,8 +138,14 @@ class FrameRetryTests(unittest.TestCase):
         self.assertEqual(
             urequest.urlopen.call_args_list,
             [
-                call("http://your-service-host:18765/image-metadata.json"),
-                call(frame.IMAGE_URL),
+                call(
+                    "http://your-service-host:18765/image-metadata.json"
+                    "?showMetadata=true"
+                ),
+                call(
+                    "http://your-service-host:18765/image.jpg"
+                    "?assetId=asset-id&orientation=both&excludeDarkerImages=false"
+                ),
             ],
         )
         settings_response.close.assert_called_once()

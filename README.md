@@ -89,8 +89,11 @@ make extra requests to Immich.
 ## Image metadata overlay
 
 Metadata display is off by default and can only be enabled by adding
-`showMetadata=true` to the image URL. It cannot be set with a Docker Compose
-environment variable. When enabled, the frame requests the
+`showMetadata=true` to the image URL. The Inky Frame Python file's default
+`IMAGE_URL` already includes this parameter, so the overlay is on by default
+for the frame. To turn it off, change it to `showMetadata=false` or remove the
+`showMetadata` query parameter from `IMAGE_URL`. The parameter cannot be set
+with a Docker Compose environment variable. When enabled, the frame requests the
 selected image's metadata and then fetches that same image, so the displayed
 details match the photo. The bottom of the screen shows the capture date,
 location, and first album name (when available). The album name is

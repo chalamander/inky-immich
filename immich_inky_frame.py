@@ -13,7 +13,7 @@ WIDTH = 800
 HEIGHT = 480
 
 # Change the server address to where the inky-immich service is running.
-IMAGE_URL = "http://your-service-host:18765/image.jpg"
+IMAGE_URL = "http://your-service-host:18765/image.jpg?showMetadata=true"
 FILENAME = "immich-image.jpg"
 
 # Length of time between updates in minutes.
