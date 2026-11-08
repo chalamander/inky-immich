@@ -1,6 +1,7 @@
 import io
 import os
 import random
+from datetime import date
 from urllib.parse import quote
 
 import requests
@@ -275,6 +276,27 @@ def _fetch_asset_album(asset_id, api_base, headers):
     return ""
 
 
+def _format_image_date(created_at):
+    if not isinstance(created_at, str):
+        return ""
+    try:
+        image_date = date.fromisoformat(created_at[:10])
+    except ValueError:
+        return ""
+
+    day = image_date.day
+    suffix = "th" if 10 < day % 100 < 14 else {
+        1: "st",
+        2: "nd",
+        3: "rd",
+    }.get(day % 10, "th")
+    month = (
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December",
+    )[image_date.month - 1]
+    return f"{day}{suffix} {month} {image_date.year}"
+
+
 def _asset_metadata(asset, album, orientation):
     exif = asset.get("exifInfo")
     if not isinstance(exif, dict):
@@ -291,12 +313,10 @@ def _asset_metadata(asset, album, orientation):
         if isinstance(latitude, (int, float)) and isinstance(longitude, (int, float)):
             location = f"{latitude:.4f}/{longitude:.4f}"
 
-    created_at = asset.get("fileCreatedAt")
-    image_date = created_at[:10] if isinstance(created_at, str) else ""
     return {
         "assetId": asset["id"],
         "orientation": orientation,
-        "date": image_date,
+        "date": _format_image_date(asset.get("fileCreatedAt")),
         "location": location,
         "album": album,
     }

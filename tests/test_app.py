@@ -110,6 +110,28 @@ class ProcessImageTests(unittest.TestCase):
         self.assertGreater(right_pixel[0], right_pixel[2])
 
 
+class MetadataFormattingTests(unittest.TestCase):
+    def test_formats_dates_with_ordinal_day_and_written_month(self):
+        cases = {
+            "2024-05-01T12:30:00.000Z": "1st May 2024",
+            "2024-08-02T12:30:00.000Z": "2nd August 2024",
+            "2024-03-03T12:30:00.000Z": "3rd March 2024",
+            "2024-05-06T12:30:00.000Z": "6th May 2024",
+            "2024-08-11T12:30:00.000Z": "11th August 2024",
+            "2024-08-12T12:30:00.000Z": "12th August 2024",
+            "2024-08-13T12:30:00.000Z": "13th August 2024",
+            "2024-08-21T12:30:00.000Z": "21st August 2024",
+        }
+
+        for created_at, expected in cases.items():
+            with self.subTest(created_at=created_at):
+                self.assertEqual(app._format_image_date(created_at), expected)
+
+    def test_missing_or_invalid_date_is_omitted(self):
+        self.assertEqual(app._format_image_date(None), "")
+        self.assertEqual(app._format_image_date("not-a-date"), "")
+
+
 class EndpointTests(unittest.TestCase):
     def setUp(self):
         app.app.config.update(TESTING=True)
@@ -290,7 +312,7 @@ class EndpointTests(unittest.TestCase):
             {
                 "assetId": asset_id,
                 "orientation": "portrait",
-                "date": "2024-05-06",
+                "date": "6th May 2024",
                 "location": "London / Greater London / United Kingdom",
                 "album": "First album",
             },
