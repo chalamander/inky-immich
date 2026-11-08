@@ -130,7 +130,7 @@ def draw():
         try:
             jpeg = jpegdec.JPEG(graphics)
             jpeg.open_file(FILENAME)
-            jpeg.decode()
+            jpeg.decode(dither=False)
         except (OSError, RuntimeError) as error:
             print(error)
             draw_error("Unable to display image")

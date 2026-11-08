@@ -3,7 +3,7 @@ import os
 import unittest
 from unittest.mock import Mock, patch
 
-from PIL import Image
+from PIL import Image, ImageStat
 
 import app
 
@@ -33,28 +33,37 @@ class ProcessImageTests(unittest.TestCase):
                     self.assertEqual(output.size, (800, 480))
                     self.assertEqual(output.mode, "RGB")
 
-    def test_increases_saturation(self):
-        source_color = (123, 77, 189)
-        result = app.process_image(make_image((800, 480), source_color))
-
-        with Image.open(io.BytesIO(result)) as output:
-            pixel = output.getpixel((400, 240))
-
-        self.assertGreater(pixel[2] - pixel[0], source_color[2] - source_color[0])
-
-    def test_shadow_lift_brightens_shadows_and_preserves_highlights(self):
+    def test_gamma_and_contrast_lift_dark_images(self):
         shadow = make_image((800, 480), (40, 40, 40))
+        midtone = make_image((800, 480), (120, 120, 120))
         highlight = make_image((800, 480), (200, 200, 200))
 
         with Image.open(io.BytesIO(app.process_image(shadow))) as output:
-            shadow_pixel = output.getpixel((400, 240))
+            shadow_mean = ImageStat.Stat(output.convert("L")).mean[0]
+        with Image.open(io.BytesIO(app.process_image(midtone))) as output:
+            midtone_mean = ImageStat.Stat(output.convert("L")).mean[0]
         with Image.open(io.BytesIO(app.process_image(highlight))) as output:
-            highlight_pixel = output.getpixel((400, 240))
+            highlight_mean = ImageStat.Stat(output.convert("L")).mean[0]
 
-        self.assertGreater(shadow_pixel[0], 40)
-        self.assertLessEqual(max(shadow_pixel) - min(shadow_pixel), 2)
-        self.assertAlmostEqual(highlight_pixel[0], 200, delta=2)
-        self.assertLessEqual(max(highlight_pixel) - min(highlight_pixel), 2)
+        self.assertGreater(shadow_mean, 40)
+        self.assertGreater(midtone_mean, 120)
+        self.assertGreater(highlight_mean, 200)
+
+    def test_output_is_dithered_to_inky_frame_palette(self):
+        source = make_image((800, 480), (110, 75, 190))
+
+        with Image.open(io.BytesIO(app.process_image(source))) as output:
+            colors = output.convert("RGB").getcolors(maxcolors=1000000)
+
+        self.assertIsNotNone(colors)
+        for _, color in colors:
+            self.assertLessEqual(
+                min(
+                    sum((channel - target) ** 2 for channel, target in zip(color, palette_color))
+                    for palette_color in app.INKY_PALETTE_COLORS
+                ),
+                300,
+            )
 
     def test_applies_exif_orientation_before_fit(self):
         pixels = Image.new("RGB", (120, 60), "black")
@@ -70,11 +79,7 @@ class ProcessImageTests(unittest.TestCase):
 
         with Image.open(io.BytesIO(result)) as output:
             self.assertEqual(output.size, (800, 480))
-            self.assertAlmostEqual(
-                output.getpixel((400, 30))[0],
-                app.SHADOW_LUT[0],
-                delta=2,
-            )
+            self.assertLessEqual(output.getpixel((400, 30))[0], 3)
             self.assertEqual(output.getpixel((400, 450))[0], 255)
 
     def test_orientation_matching_applies_exif_rotation(self):

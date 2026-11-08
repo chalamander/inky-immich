@@ -140,6 +140,7 @@ class FrameRetryTests(unittest.TestCase):
 
         frame.draw()
 
+        jpeg.decode.assert_called_once_with(dither=False)
         frame.graphics.rectangle.assert_called_once_with(
             0,
             frame.HEIGHT - 25,

@@ -15,15 +15,19 @@ HEIGHT = 480
 REQUEST_TIMEOUT = (5, 20)
 JPEG_QUALITY = 100
 SATURATION_FACTOR = 1.3
-SHADOW_THRESHOLD = 160
-MAX_SHADOW_LIFT = 32
+GAMMA = 0.68
+CONTRAST_FACTOR = 1.1
 MINIMUM_AVERAGE_BRIGHTNESS = 80
-SHADOW_LUT = [
-    round(
-        value + MAX_SHADOW_LIFT * (1 - value / SHADOW_THRESHOLD) ** 2
-    ) if value < SHADOW_THRESHOLD else value
-    for value in range(256)
-]
+GAMMA_LUT = [round(255 * (value / 255) ** GAMMA) for value in range(256)]
+INKY_PALETTE_COLORS = (
+    (0, 0, 0),
+    (255, 255, 255),
+    (0, 255, 0),
+    (0, 0, 255),
+    (255, 0, 0),
+    (255, 255, 0),
+    (255, 128, 0),
+)
 ORIENTATIONS = {"landscape", "portrait", "both"}
 
 
@@ -47,12 +51,26 @@ def process_image(image_bytes, orientation="both"):
                 method=Image.Resampling.LANCZOS,
                 centering=(0.5, 0.5),
             )
-            saturated = ImageEnhance.Color(fitted).enhance(SATURATION_FACTOR)
-            luminance, chroma_blue, chroma_red = saturated.convert("YCbCr").split()
-            lifted_luminance = luminance.point(SHADOW_LUT)
-            enhanced = Image.merge(
+            luminance, chroma_blue, chroma_red = fitted.convert("YCbCr").split()
+            lifted_luminance = luminance.point(GAMMA_LUT)
+            brightened = Image.merge(
                 "YCbCr",
                 (lifted_luminance, chroma_blue, chroma_red),
+            ).convert("RGB")
+            high_contrast = ImageEnhance.Contrast(brightened).enhance(
+                CONTRAST_FACTOR
+            )
+            saturated = ImageEnhance.Color(high_contrast).enhance(SATURATION_FACTOR)
+            palette = Image.new("P", (1, 1))
+            palette_data = [
+                channel
+                for color in INKY_PALETTE_COLORS
+                for channel in color
+            ]
+            palette.putpalette(palette_data + [0] * (768 - len(palette_data)))
+            enhanced = saturated.quantize(
+                palette=palette,
+                dither=Image.Dither.FLOYDSTEINBERG,
             ).convert("RGB")
         output = io.BytesIO()
         enhanced.save(
