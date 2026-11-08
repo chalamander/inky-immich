@@ -209,6 +209,78 @@ class EndpointTests(unittest.TestCase):
             },
         )
 
+    @patch.dict(os.environ, {
+        "IMMICH_URL": "http://immich:2283",
+        "IMMICH_API_KEY": "test-key",
+        "ORIENTATION": "portrait",
+        "PEOPLE": "person-1, person-2",
+        "INCLUDE_TAGS": "include-1,include-2",
+        "EXCLUDE_TAGS": "exclude-1",
+        "EXCLUDE_DARKER_IMAGES": "false",
+    }, clear=True)
+    @patch("app.requests.get")
+    @patch("app.requests.post")
+    def test_selection_environment_variables_set_default_filters(
+        self,
+        mock_post,
+        mock_get,
+    ):
+        mock_post.return_value.json.return_value = [{"id": "portrait"}]
+        mock_get.return_value.content = make_image((300, 500), (120, 130, 140))
+
+        response = self.client.get("/image.jpg")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            mock_post.call_args.kwargs["json"],
+            {
+                "size": 20,
+                "filter": {
+                    "type": {"eq": "IMAGE"},
+                    "personIds": {"any": ["person-1", "person-2"]},
+                    "tagIds": {"any": ["include-1", "include-2"], "none": ["exclude-1"]},
+                },
+            },
+        )
+
+    @patch.dict(os.environ, {
+        "IMMICH_URL": "http://immich:2283",
+        "IMMICH_API_KEY": "test-key",
+        "ORIENTATION": "portrait",
+        "PEOPLE": "environment-person",
+        "INCLUDE_TAGS": "environment-include",
+        "EXCLUDE_TAGS": "environment-exclude",
+        "EXCLUDE_DARKER_IMAGES": "true",
+    }, clear=True)
+    @patch("app.requests.get")
+    @patch("app.requests.post")
+    def test_url_parameters_override_environment_defaults(
+        self,
+        mock_post,
+        mock_get,
+    ):
+        mock_post.return_value.json.return_value = [{"id": "asset-id"}]
+        mock_get.return_value.content = make_image((400, 300), (120, 130, 140))
+
+        response = self.client.get(
+            "/image.jpg?orientation=both&people=url-person"
+            "&includeTags=url-include&excludeTags=url-exclude"
+            "&excludeDarkerImages=false"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            mock_post.call_args.kwargs["json"],
+            {
+                "size": 20,
+                "filter": {
+                    "type": {"eq": "IMAGE"},
+                    "personIds": {"any": ["url-person"]},
+                    "tagIds": {"any": ["url-include"], "none": ["url-exclude"]},
+                },
+            },
+        )
+
     @patch.dict(os.environ, {"IMMICH_URL": "http://immich:2283", "IMMICH_API_KEY": "test-key"})
     @patch("app.requests.get")
     @patch("app.requests.post")
@@ -298,7 +370,10 @@ class EndpointTests(unittest.TestCase):
             "excludeDarkerImages must be a boolean.",
         )
 
-    @patch.dict(os.environ, {"IMMICH_URL": "http://immich:2283", "IMMICH_API_KEY": "test-key"})
+    @patch.dict(os.environ, {
+        "IMMICH_URL": "http://immich:2283",
+        "IMMICH_API_KEY": "test-key",
+    })
     @patch("app.requests.get")
     @patch("app.requests.post")
     def test_metadata_endpoint_returns_date_location_and_first_album(
@@ -324,7 +399,7 @@ class EndpointTests(unittest.TestCase):
             ])),
         ]
 
-        response = self.client.get("/image-metadata.json?orientation=portrait")
+        response = self.client.get("/image-metadata.json?orientation=portrait&showMetadata=true")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
@@ -332,6 +407,8 @@ class EndpointTests(unittest.TestCase):
             {
                 "assetId": asset_id,
                 "orientation": "portrait",
+                "showMetadata": True,
+                "excludeDarkerImages": False,
                 "date": "6th May 2024",
                 "location": "London / Greater London / United Kingdom",
                 "album": "First album",
@@ -342,6 +419,26 @@ class EndpointTests(unittest.TestCase):
             mock_get.call_args_list[1].kwargs["params"],
             {"assetId": asset_id},
         )
+
+    @patch.dict(os.environ, {"SHOW_METADATA": "true"})
+    def test_show_metadata_is_not_enabled_by_environment(self):
+        response = self.client.get("/image-metadata.json")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {"showMetadata": False})
+
+    @patch.dict(os.environ, {
+        "IMMICH_URL": "http://immich:2283",
+        "IMMICH_API_KEY": "test-key",
+        "SHOW_METADATA": "true",
+    })
+    @patch("app.requests.post")
+    def test_show_metadata_url_false_disables_metadata(self, mock_post):
+        response = self.client.get("/image-metadata.json?showMetadata=false")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {"showMetadata": False})
+        mock_post.assert_not_called()
 
     @patch.dict(os.environ, {"IMMICH_URL": "http://immich:2283", "IMMICH_API_KEY": "test-key"})
     @patch("app.requests.get")

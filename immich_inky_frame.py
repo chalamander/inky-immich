@@ -35,21 +35,13 @@ def _metadata_url():
     return metadata_path
 
 
-def _show_metadata():
-    query = IMAGE_URL.split("?", 1)[1] if "?" in IMAGE_URL else ""
-    for parameter in query.split("&"):
-        key, separator, value = parameter.partition("=")
-        if key == "showMetadata" and separator:
-            return value.lower() in ("1", "true", "yes", "on")
-    return False
-
-
 def _image_url_for_asset(metadata):
     image_path = IMAGE_URL.split("?", 1)[0]
-    return "{}?assetId={}&orientation={}".format(
+    return "{}?assetId={}&orientation={}&excludeDarkerImages={}".format(
         image_path,
         metadata["assetId"],
         metadata.get("orientation", "both"),
+        "true" if metadata.get("excludeDarkerImages") else "false",
     )
 
 
@@ -60,13 +52,12 @@ def update():
     image_metadata = ""
     for attempt in range(MAX_FETCH_ATTEMPTS):
         try:
-            metadata = None
-            if _show_metadata():
-                metadata_response = urequest.urlopen(_metadata_url())
-                try:
-                    metadata = load(metadata_response)
-                finally:
-                    metadata_response.close()
+            metadata_response = urequest.urlopen(_metadata_url())
+            try:
+                metadata = load(metadata_response)
+            finally:
+                metadata_response.close()
+            if metadata.get("showMetadata"):
                 image_url = _image_url_for_asset(metadata)
             else:
                 image_url = IMAGE_URL
@@ -91,7 +82,7 @@ def update():
                     raise ValueError("Image service returned an empty image")
             finally:
                 response.close()
-            if metadata:
+            if metadata.get("showMetadata"):
                 image_metadata = ", ".join(
                     value for value in (
                         metadata.get("date"),

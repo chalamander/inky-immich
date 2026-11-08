@@ -7,6 +7,11 @@ services:
     environment:
       IMMICH_URL: ${IMMICH_URL:?Set IMMICH_URL in your environment or .env file}
       IMMICH_API_KEY: ${IMMICH_API_KEY:?Set IMMICH_API_KEY in your environment or .env file}
+      ORIENTATION: ${ORIENTATION:-}
+      PEOPLE: ${PEOPLE:-}
+      INCLUDE_TAGS: ${INCLUDE_TAGS:-}
+      EXCLUDE_TAGS: ${EXCLUDE_TAGS:-}
+      EXCLUDE_DARKER_IMAGES: ${EXCLUDE_DARKER_IMAGES:-}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=5).close()"]
       interval: 30s

@@ -25,7 +25,23 @@ Create a `.env` file in this directory (it is ignored by Git):
 ```dotenv
 IMMICH_URL=http://your-immich-server:2283
 IMMICH_API_KEY=your-immich-api-key
+# Optional image-selection defaults:
+ORIENTATION=both
+EXCLUDE_DARKER_IMAGES=false
+# Optional filters; replace with IDs from your Immich installation:
+# PEOPLE=person-id-1,person-id-2
+# INCLUDE_TAGS=tag-id-1,tag-id-2
+# EXCLUDE_TAGS=tag-id-3
 ```
+
+The optional variables set server-wide defaults for the corresponding image
+URL parameters. A URL parameter takes precedence over its environment variable;
+for list parameters, specifying the URL parameter replaces the full list from
+the environment. Lists in `.env` use comma-separated values. `PEOPLE`,
+`INCLUDE_TAGS`, and `EXCLUDE_TAGS` are intentionally omitted and unset by
+default; set them only when you want to filter using IDs from your Immich
+installation. `showMetadata` is the exception: it is controlled only by the
+URL query parameter and has no environment-variable setting.
 
 Start the service with Docker Compose:
 
@@ -41,12 +57,12 @@ accepts the following optional query parameters:
 
 | Parameter | Description |
 |---|---|
-| `orientation` | Select `landscape`, `portrait`, or `both` images. Defaults to `both`. Portrait images are rotated for a screen mounted at -90°. |
-| `people` | Filter to images containing any of the specified Immich person IDs. Supply multiple IDs as a comma-separated list or repeat the parameter. |
-| `includeTags` | Include images matching any of the specified Immich tag IDs. Accepts comma-separated IDs or repeated parameters. |
-| `excludeTags` | Exclude images matching any of the specified Immich tag IDs. Accepts comma-separated IDs or repeated parameters. |
-| `excludeDarkerImages` | Set to `true` to skip images whose average grayscale brightness is below 80/255. Defaults to `false`. |
-| `showMetadata` | Set to `true` to enable the Inky Frame metadata overlay. Defaults to `false`; metadata includes the capture date, location, and first album when available. |
+| `orientation` | Select `landscape`, `portrait`, or `both` images. Defaults to `ORIENTATION`, then `both`. Portrait images are rotated for a screen mounted at -90°. |
+| `people` | Filter to images containing any of the specified Immich person IDs. Supply multiple IDs as a comma-separated list or repeat the parameter. Overrides `PEOPLE`. |
+| `includeTags` | Include images matching any of the specified Immich tag IDs. Accepts comma-separated IDs or repeated parameters. Overrides `INCLUDE_TAGS`. |
+| `excludeTags` | Exclude images matching any of the specified Immich tag IDs. Accepts comma-separated IDs or repeated parameters. Overrides `EXCLUDE_TAGS`. |
+| `excludeDarkerImages` | Set to `true` to skip images whose average grayscale brightness is below 80/255. Defaults to `EXCLUDE_DARKER_IMAGES`, then `false`. |
+| `showMetadata` | Set to `true` to enable the Inky Frame metadata overlay. This URL-only parameter defaults to `false`; metadata includes the capture date, location, and first album when available. |
 
 For example, `http://your-service-host:18765/image.jpg?orientation=portrait`
 returns a portrait source image rotated 90° clockwise for a screen mounted at
@@ -72,8 +88,9 @@ make extra requests to Immich.
 
 ## Image metadata overlay
 
-Metadata display is off by default. To enable it, add
-`showMetadata=true` in the image URL. When enabled, the frame requests the
+Metadata display is off by default and can only be enabled by adding
+`showMetadata=true` to the image URL. It cannot be set with a Docker Compose
+environment variable. When enabled, the frame requests the
 selected image's metadata and then fetches that same image, so the displayed
 details match the photo. The bottom of the screen shows the capture date,
 location, and first album name (when available), separated by commas. Missing

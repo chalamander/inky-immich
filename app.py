@@ -100,9 +100,13 @@ def _matches_minimum_brightness(image_bytes):
         raise ServiceError("Immich image could not be processed.") from error
 
 
-def _boolean_query_parameter(name, default=False):
-    value = request.args.get(name)
-    if value is None:
+def _boolean_query_or_environment(name, environment_name, default=False):
+    value = _query_or_environment(name, environment_name)
+    return _parse_boolean_value(name, value, default)
+
+
+def _parse_boolean_value(name, value, default=False):
+    if value is None or not value.strip():
         return default
     normalized = value.strip().lower()
     if normalized in {"true", "1", "yes", "on"}:
@@ -110,6 +114,28 @@ def _boolean_query_parameter(name, default=False):
     if normalized in {"false", "0", "no", "off"}:
         return False
     raise ValueError(f"{name} must be a boolean.")
+
+
+def _query_or_environment(query_name, environment_name, default=None):
+    if query_name in request.args:
+        return request.args.get(query_name, "")
+    value = os.environ.get(environment_name)
+    if value is None or not value.strip():
+        return default
+    return value.strip()
+
+
+def _list_query_or_environment(query_name, environment_name):
+    if query_name in request.args:
+        values = request.args.getlist(query_name)
+    else:
+        values = [os.environ.get(environment_name, "")]
+    return [
+        item.strip()
+        for value in values
+        for item in value.split(",")
+        if item.strip()
+    ]
 
 
 def _configuration():
@@ -249,25 +275,13 @@ def fetch_random_thumbnail(
 
 def _image_filters():
     return {
-        "people": [
-            person_id.strip()
-            for value in request.args.getlist("people")
-            for person_id in value.split(",")
-            if person_id.strip()
-        ],
-        "include_tags": [
-            tag.strip()
-            for value in request.args.getlist("includeTags")
-            for tag in value.split(",")
-            if tag.strip()
-        ],
-        "exclude_tags": [
-            tag.strip()
-            for value in request.args.getlist("excludeTags")
-            for tag in value.split(",")
-            if tag.strip()
-        ],
-        "exclude_darker_images": _boolean_query_parameter("excludeDarkerImages"),
+        "people": _list_query_or_environment("people", "PEOPLE"),
+        "include_tags": _list_query_or_environment("includeTags", "INCLUDE_TAGS"),
+        "exclude_tags": _list_query_or_environment("excludeTags", "EXCLUDE_TAGS"),
+        "exclude_darker_images": _boolean_query_or_environment(
+            "excludeDarkerImages",
+            "EXCLUDE_DARKER_IMAGES",
+        ),
     }
 
 
@@ -343,9 +357,20 @@ def health():
 
 @app.get("/image-metadata.json")
 def image_metadata():
-    orientation = request.args.get("orientation", "both")
+    try:
+        show_metadata = _parse_boolean_value(
+            "showMetadata",
+            request.args.get("showMetadata"),
+        )
+        orientation = _query_or_environment("orientation", "ORIENTATION", "both")
+    except ValueError as error:
+        return jsonify(error=str(error)), 400
+
     if orientation not in ORIENTATIONS:
         return jsonify(error="orientation must be landscape, portrait, or both."), 400
+
+    if not show_metadata:
+        return jsonify(showMetadata=False)
 
     try:
         filters = _image_filters()
@@ -357,7 +382,10 @@ def image_metadata():
             filters["exclude_darker_images"],
         )
         album = _fetch_asset_album(asset["id"], api_base, headers)
-        return jsonify(_asset_metadata(asset, album, orientation))
+        metadata = _asset_metadata(asset, album, orientation)
+        metadata["showMetadata"] = True
+        metadata["excludeDarkerImages"] = filters["exclude_darker_images"]
+        return jsonify(metadata)
     except ValueError as error:
         return jsonify(error=str(error)), 400
     except ServiceError as error:
@@ -368,7 +396,11 @@ def image_metadata():
 
 @app.get("/image.jpg")
 def image():
-    orientation = request.args.get("orientation", "both")
+    try:
+        orientation = _query_or_environment("orientation", "ORIENTATION", "both")
+    except ValueError as error:
+        return jsonify(error=str(error)), 400
+
     if orientation not in ORIENTATIONS:
         return jsonify(error="orientation must be landscape, portrait, or both."), 400
 

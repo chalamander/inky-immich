@@ -45,12 +45,13 @@ class FrameRetryTests(unittest.TestCase):
         frame.IMAGE_URL = (
             "http://your-service-host:18765/image.jpg"
             "?orientation=portrait&people=person-id&includeTags=tag-id"
-            "&showMetadata=true"
         )
         metadata_response = types.SimpleNamespace(
             metadata={
+                "showMetadata": True,
                 "assetId": "asset-id",
                 "orientation": "portrait",
+                "excludeDarkerImages": False,
                 "date": "2024-05-06",
                 "location": "London",
                 "album": "Holiday",
@@ -88,16 +89,14 @@ class FrameRetryTests(unittest.TestCase):
                 call(
                     "http://your-service-host:18765/image-metadata.json"
                     "?orientation=portrait&people=person-id&includeTags=tag-id"
-                    "&showMetadata=true"
                 ),
                 call(
                     "http://your-service-host:18765/image-metadata.json"
                     "?orientation=portrait&people=person-id&includeTags=tag-id"
-                    "&showMetadata=true"
                 ),
                 call(
                     "http://your-service-host:18765/image.jpg"
-                    "?assetId=asset-id&orientation=portrait"
+                    "?assetId=asset-id&orientation=portrait&excludeDarkerImages=false"
                 ),
             ],
         )
@@ -108,6 +107,8 @@ class FrameRetryTests(unittest.TestCase):
 
     def test_metadata_is_off_by_default(self):
         frame, urequest = load_frame_module()
+        settings_response = types.SimpleNamespace(metadata={"showMetadata": False})
+        settings_response.close = Mock()
         response = types.SimpleNamespace()
         payload = bytearray(b"\xff\xd8")
 
@@ -121,14 +122,19 @@ class FrameRetryTests(unittest.TestCase):
 
         response.readinto = readinto
         response.close = Mock()
-        urequest.urlopen = Mock(return_value=response)
+        urequest.urlopen = Mock(side_effect=[settings_response, response])
 
         with patch("builtins.open", mock_open()):
             frame.update()
 
-        urequest.urlopen.assert_called_once_with(
-            frame.IMAGE_URL,
+        self.assertEqual(
+            urequest.urlopen.call_args_list,
+            [
+                call("http://your-service-host:18765/image-metadata.json"),
+                call(frame.IMAGE_URL),
+            ],
         )
+        settings_response.close.assert_called_once()
         self.assertEqual(frame.image_metadata, "")
 
     def test_draw_overlays_metadata_in_bottom_banner(self):
