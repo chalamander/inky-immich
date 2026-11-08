@@ -85,6 +85,13 @@ class ProcessImageTests(unittest.TestCase):
         self.assertTrue(app._matches_orientation(image_bytes, "portrait"))
         self.assertFalse(app._matches_orientation(image_bytes, "landscape"))
 
+    def test_minimum_brightness_excludes_dark_images(self):
+        dark = make_image((80, 60), (45, 45, 45))
+        bright = make_image((80, 60), (120, 120, 120))
+
+        self.assertFalse(app._matches_minimum_brightness(dark))
+        self.assertTrue(app._matches_minimum_brightness(bright))
+
     def test_portrait_images_are_rotated_clockwise_and_fit_landscape_output(self):
         source = Image.new("RGB", (300, 500), "red")
         for y in range(250, 500):
@@ -197,6 +204,56 @@ class EndpointTests(unittest.TestCase):
                     "tagIds": {"any": include_tags, "none": exclude_tags},
                 },
             },
+        )
+
+    @patch.dict(os.environ, {"IMMICH_URL": "http://immich:2283", "IMMICH_API_KEY": "test-key"})
+    @patch("app.random.shuffle", side_effect=lambda candidates: None)
+    @patch("app.requests.get")
+    @patch("app.requests.post")
+    def test_exclude_darker_images_skips_dark_candidates(
+        self,
+        mock_post,
+        mock_get,
+        _mock_shuffle,
+    ):
+        mock_post.return_value.json.return_value = [
+            {"id": "dark"},
+            {"id": "bright"},
+        ]
+        mock_get.side_effect = [
+            Mock(content=make_image((80, 60), (45, 45, 45))),
+            Mock(content=make_image((80, 60), (120, 120, 120))),
+        ]
+
+        response = self.client.get("/image.jpg?excludeDarkerImages=true")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(mock_get.call_count, 2)
+        self.assertIn("/assets/bright/thumbnail", mock_get.call_args.args[0])
+
+    @patch.dict(os.environ, {"IMMICH_URL": "http://immich:2283", "IMMICH_API_KEY": "test-key"})
+    @patch("app.requests.get")
+    @patch("app.requests.post")
+    def test_exclude_darker_images_returns_error_when_all_candidates_are_dark(
+        self,
+        mock_post,
+        mock_get,
+    ):
+        mock_post.return_value.json.return_value = [{"id": "dark"}]
+        mock_get.return_value.content = make_image((80, 60), (45, 45, 45))
+
+        response = self.client.get("/image.jpg?excludeDarkerImages=true")
+
+        self.assertEqual(response.status_code, 502)
+        self.assertIn("minimum average brightness", response.get_json()["error"])
+
+    def test_exclude_darker_images_rejects_invalid_boolean(self):
+        response = self.client.get("/image.jpg?excludeDarkerImages=perhaps")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.get_json()["error"],
+            "excludeDarkerImages must be a boolean.",
         )
 
     @patch.dict(os.environ, {"IMMICH_URL": "http://immich:2283", "IMMICH_API_KEY": "test-key"})

@@ -45,6 +45,7 @@ accepts the following optional query parameters:
 | `people` | Filter to images containing any of the specified Immich person IDs. Supply multiple IDs as a comma-separated list or repeat the parameter. |
 | `includeTags` | Include images matching any of the specified Immich tag IDs. Accepts comma-separated IDs or repeated parameters. |
 | `excludeTags` | Exclude images matching any of the specified Immich tag IDs. Accepts comma-separated IDs or repeated parameters. |
+| `excludeDarkerImages` | Set to `true` to skip images whose average grayscale brightness is below 80/255. Defaults to `false`. |
 | `showMetadata` | Set to `true` to enable the Inky Frame metadata overlay. Defaults to `false`; metadata includes the capture date, location, and first album when available. |
 
 For example, `http://your-service-host:18765/image.jpg?orientation=portrait`
@@ -54,6 +55,8 @@ repeating the parameter. The `people` filter matches any listed person;
 `includeTags` and `excludeTags` can be combined. If there are no images in the
 requested orientation, the endpoint returns an error. Images are returned at
 800×480.
+When `excludeDarkerImages=true`, the service checks candidate preview
+thumbnails and skips any with average grayscale brightness below 80/255.
 
 The container health check uses a separate `/healthz` endpoint and does not
 make extra requests to Immich.
