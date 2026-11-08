@@ -4,6 +4,7 @@ import random
 from datetime import date
 from urllib.parse import quote
 
+import regex
 import requests
 from flask import Flask, Response, jsonify, request
 from PIL import Image, ImageEnhance, ImageOps, ImageStat, UnidentifiedImageError
@@ -20,6 +21,17 @@ CONTRAST_FACTOR = 1.1
 MINIMUM_AVERAGE_BRIGHTNESS = 80
 GAMMA_LUT = [round(255 * (value / 255) ** GAMMA) for value in range(256)]
 ORIENTATIONS = {"landscape", "portrait", "both"}
+EMOJI_BASE_PATTERN = (
+    r"(?:\p{Emoji_Presentation}\uFE0F?"
+    r"|\p{Extended_Pictographic}\uFE0F)"
+)
+EMOJI_PATTERN = regex.compile(
+    rf"(?:{EMOJI_BASE_PATTERN}(?:\p{{Emoji_Modifier}})?"
+    rf"(?:\u200D{EMOJI_BASE_PATTERN}(?:\p{{Emoji_Modifier}})?)*"
+    r"(?:[\U000E0020-\U000E007E]*\U000E007F)?)"
+    r"|(?:\p{Regional_Indicator}{2})"
+    r"|(?:[#*0-9]\uFE0F?\u20E3)"
+)
 
 
 class ServiceError(Exception):
@@ -28,6 +40,10 @@ class ServiceError(Exception):
 
 class ConfigurationError(ServiceError):
     pass
+
+
+def _remove_emojis(text):
+    return " ".join(EMOJI_PATTERN.sub("", text).split())
 
 
 def process_image(image_bytes, orientation="both"):
@@ -270,7 +286,7 @@ def _fetch_asset_album(asset_id, api_base, headers):
         raise ServiceError("Immich album lookup returned an unexpected response.")
     for album in albums:
         if isinstance(album, dict) and isinstance(album.get("albumName"), str):
-            return album["albumName"]
+            return _remove_emojis(album["albumName"])
     return ""
 
 

@@ -135,6 +135,22 @@ class MetadataFormattingTests(unittest.TestCase):
         self.assertEqual(app._format_image_date(None), "")
         self.assertEqual(app._format_image_date("not-a-date"), "")
 
+    def test_removes_emoji_sequences_from_album_titles(self):
+        cases = {
+            "Summer 🌴 Trip": "Summer Trip",
+            "Family 👨‍👩‍👧‍👦": "Family",
+            "Travel 🇬🇧": "Travel",
+            "Keycap 1️⃣": "Keycap",
+            "Copyright ©️ 2026": "Copyright 2026",
+        }
+
+        for title, expected in cases.items():
+            with self.subTest(title=title):
+                self.assertEqual(app._remove_emojis(title), expected)
+
+    def test_preserves_non_emoji_title_characters(self):
+        self.assertEqual(app._remove_emojis("Summer © 2026"), "Summer © 2026")
+
 
 class EndpointTests(unittest.TestCase):
     def setUp(self):
@@ -303,7 +319,7 @@ class EndpointTests(unittest.TestCase):
         mock_get.side_effect = [
             Mock(content=make_image((300, 500), (120, 130, 140))),
             Mock(json=Mock(return_value=[
-                {"albumName": "First album"},
+                {"albumName": "First 🌄 album"},
                 {"albumName": "Second album"},
             ])),
         ]
