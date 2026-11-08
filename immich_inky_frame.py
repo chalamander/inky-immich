@@ -76,7 +76,12 @@ def update():
                         if downloaded == 0 and (
                             bytes_read < 2 or data[0] != 0xFF or data[1] != 0xD8
                         ):
-                            raise ValueError("Image service did not return a JPEG")
+                            response_start = bytes(data[:min(bytes_read, 160)])
+                            raise ValueError(
+                                "Image service did not return a JPEG: {}".format(
+                                    response_start
+                                )
+                            )
                         image_file.write(data[:bytes_read])
                         downloaded += bytes_read
 

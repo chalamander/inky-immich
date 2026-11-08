@@ -151,6 +151,52 @@ class FrameRetryTests(unittest.TestCase):
         settings_response.close.assert_called_once()
         self.assertEqual(frame.image_metadata, "")
 
+    def test_logs_response_body_when_image_is_not_a_jpeg(self):
+        frame, urequest = load_frame_module()
+
+        def image_response(contents):
+            payload = bytearray(contents)
+            response = types.SimpleNamespace()
+
+            def readinto(buffer):
+                if not payload:
+                    return 0
+                count = min(len(buffer), len(payload))
+                buffer[:count] = payload[:count]
+                del payload[:count]
+                return count
+
+            response.readinto = readinto
+            response.close = Mock()
+            return response
+
+        metadata_responses = [
+            types.SimpleNamespace(metadata={"showMetadata": False})
+            for _ in range(2)
+        ]
+        for response in metadata_responses:
+            response.close = Mock()
+        bad_body = b'{"error":"Immich request failed"}'
+        urequest.urlopen = Mock(side_effect=[
+            metadata_responses[0],
+            image_response(bad_body),
+            metadata_responses[1],
+            image_response(b"\xff\xd8"),
+        ])
+
+        with (
+            patch("builtins.open", mock_open()),
+            patch.object(frame.time, "sleep"),
+            patch("builtins.print") as print_mock,
+        ):
+            frame.update()
+
+        self.assertEqual(
+            str(print_mock.call_args_list[0].args[0]),
+            "Image service did not return a JPEG: {}".format(bad_body),
+        )
+        self.assertIsNone(frame.image_error)
+
     def test_draw_overlays_metadata_in_bottom_banner(self):
         frame, _ = load_frame_module()
         frame.graphics = Mock()
