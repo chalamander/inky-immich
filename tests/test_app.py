@@ -1,5 +1,6 @@
 import io
 import os
+import random
 import unittest
 from unittest.mock import Mock, patch
 
@@ -49,21 +50,19 @@ class ProcessImageTests(unittest.TestCase):
         self.assertGreater(midtone_mean, 120)
         self.assertGreater(highlight_mean, 200)
 
-    def test_output_is_dithered_to_inky_frame_palette(self):
-        source = make_image((800, 480), (110, 75, 190))
+    def test_processed_jpeg_is_small_enough_for_frame_storage(self):
+        source = Image.new("RGB", (800, 480))
+        rng = random.Random(41)
+        source.putdata([
+            (rng.randrange(256), rng.randrange(256), rng.randrange(256))
+            for _ in range(800 * 480)
+        ])
+        image_bytes = io.BytesIO()
+        source.save(image_bytes, format="JPEG", quality=90)
 
-        with Image.open(io.BytesIO(app.process_image(source))) as output:
-            colors = output.convert("RGB").getcolors(maxcolors=1000000)
+        result = app.process_image(image_bytes.getvalue())
 
-        self.assertIsNotNone(colors)
-        for _, color in colors:
-            self.assertLessEqual(
-                min(
-                    sum((channel - target) ** 2 for channel, target in zip(color, palette_color))
-                    for palette_color in app.INKY_PALETTE_COLORS
-                ),
-                300,
-            )
+        self.assertLess(len(result), 400 * 1024)
 
     def test_applies_exif_orientation_before_fit(self):
         pixels = Image.new("RGB", (120, 60), "black")

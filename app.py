@@ -13,21 +13,12 @@ app = Flask(__name__)
 WIDTH = 800
 HEIGHT = 480
 REQUEST_TIMEOUT = (5, 20)
-JPEG_QUALITY = 100
+JPEG_QUALITY = 90
 SATURATION_FACTOR = 1.3
 GAMMA = 0.68
 CONTRAST_FACTOR = 1.1
 MINIMUM_AVERAGE_BRIGHTNESS = 80
 GAMMA_LUT = [round(255 * (value / 255) ** GAMMA) for value in range(256)]
-INKY_PALETTE_COLORS = (
-    (0, 0, 0),
-    (255, 255, 255),
-    (0, 255, 0),
-    (0, 0, 255),
-    (255, 0, 0),
-    (255, 255, 0),
-    (255, 128, 0),
-)
 ORIENTATIONS = {"landscape", "portrait", "both"}
 
 
@@ -60,24 +51,13 @@ def process_image(image_bytes, orientation="both"):
             high_contrast = ImageEnhance.Contrast(brightened).enhance(
                 CONTRAST_FACTOR
             )
-            saturated = ImageEnhance.Color(high_contrast).enhance(SATURATION_FACTOR)
-            palette = Image.new("P", (1, 1))
-            palette_data = [
-                channel
-                for color in INKY_PALETTE_COLORS
-                for channel in color
-            ]
-            palette.putpalette(palette_data + [0] * (768 - len(palette_data)))
-            enhanced = saturated.quantize(
-                palette=palette,
-                dither=Image.Dither.FLOYDSTEINBERG,
-            ).convert("RGB")
+            enhanced = ImageEnhance.Color(high_contrast).enhance(SATURATION_FACTOR)
         output = io.BytesIO()
         enhanced.save(
             output,
             format="JPEG",
             quality=JPEG_QUALITY,
-            subsampling=0,
+            subsampling=2,
         )
     except (OSError, ValueError, UnidentifiedImageError) as error:
         raise ServiceError("Immich image could not be processed.") from error
