@@ -91,8 +91,9 @@ Before copying the script, change `IMAGE_URL` in the Python file to the
 
 Once the script is on the device and the web server is running, the Inky Frame
 should retrieve and display images from the `/image.jpg` endpoint. If a
-download fails, the frame retries with a 10-second timeout and 10-second
-interval, showing an error only after 20 failed attempts.
+download fails, the frame retries after a 10-second interval and shows an error
+after 20 failed attempts. The Inky Frame's `urequest.urlopen` implementation
+does not support a request timeout argument.
 
 ## Image processing
 

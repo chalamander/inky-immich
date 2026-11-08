@@ -20,7 +20,6 @@ FILENAME = "immich-image.jpg"
 # Frequent updates will reduce battery life!
 UPDATE_INTERVAL = 240
 
-REQUEST_TIMEOUT_SECONDS = 10
 RETRY_DELAY_SECONDS = 10
 MAX_FETCH_ATTEMPTS = 20
 
@@ -63,10 +62,7 @@ def update():
         try:
             metadata = None
             if _show_metadata():
-                metadata_response = urequest.urlopen(
-                    _metadata_url(),
-                    timeout=REQUEST_TIMEOUT_SECONDS,
-                )
+                metadata_response = urequest.urlopen(_metadata_url())
                 try:
                     metadata = load(metadata_response)
                 finally:
@@ -75,7 +71,7 @@ def update():
             else:
                 image_url = IMAGE_URL
 
-            response = urequest.urlopen(image_url, timeout=REQUEST_TIMEOUT_SECONDS)
+            response = urequest.urlopen(image_url)
             try:
                 downloaded = 0
                 data = bytearray(1024)

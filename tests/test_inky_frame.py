@@ -88,19 +88,16 @@ class FrameRetryTests(unittest.TestCase):
                 call(
                     "http://your-service-host:18765/image-metadata.json"
                     "?orientation=portrait&people=person-id&includeTags=tag-id"
-                    "&showMetadata=true",
-                    timeout=frame.REQUEST_TIMEOUT_SECONDS,
+                    "&showMetadata=true"
                 ),
                 call(
                     "http://your-service-host:18765/image-metadata.json"
                     "?orientation=portrait&people=person-id&includeTags=tag-id"
-                    "&showMetadata=true",
-                    timeout=frame.REQUEST_TIMEOUT_SECONDS,
+                    "&showMetadata=true"
                 ),
                 call(
                     "http://your-service-host:18765/image.jpg"
-                    "?assetId=asset-id&orientation=portrait",
-                    timeout=frame.REQUEST_TIMEOUT_SECONDS,
+                    "?assetId=asset-id&orientation=portrait"
                 ),
             ],
         )
@@ -131,7 +128,6 @@ class FrameRetryTests(unittest.TestCase):
 
         urequest.urlopen.assert_called_once_with(
             frame.IMAGE_URL,
-            timeout=frame.REQUEST_TIMEOUT_SECONDS,
         )
         self.assertEqual(frame.image_metadata, "")
 
