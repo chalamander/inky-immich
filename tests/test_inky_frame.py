@@ -100,7 +100,8 @@ class FrameRetryTests(unittest.TestCase):
                 ),
             ],
         )
-        self.assertEqual(frame.image_metadata, "2024-05-06, London, Holiday")
+        self.assertEqual(frame.image_metadata, "2024-05-06, London")
+        self.assertEqual(frame.image_album, "Holiday")
         sleep.assert_called_once_with(frame.RETRY_DELAY_SECONDS)
         metadata_response.close.assert_called_once()
         response.close.assert_called_once()
@@ -140,6 +141,9 @@ class FrameRetryTests(unittest.TestCase):
     def test_draw_overlays_metadata_in_bottom_banner(self):
         frame, _ = load_frame_module()
         frame.graphics = Mock()
+        frame.graphics.measure_text.side_effect = lambda text, scale: (
+            120 if text == "Holiday" else len(text) * 10
+        )
         jpeg = Mock()
         frame.jpegdec.JPEG = Mock(return_value=jpeg)
         frame.image_metadata = "2024-05-06, London, Holiday"
@@ -158,6 +162,49 @@ class FrameRetryTests(unittest.TestCase):
             5,
             frame.HEIGHT - 20,
             frame.WIDTH - 10,
+            2,
+        )
+
+    def test_right_aligns_album_title(self):
+        frame, _ = load_frame_module()
+        frame.graphics = Mock()
+        frame.graphics.measure_text.side_effect = lambda text, scale: (
+            120 if text == "Holiday" else len(text) * 10
+        )
+        jpeg = Mock()
+        frame.jpegdec.JPEG = Mock(return_value=jpeg)
+        frame.image_metadata = "6th May 2024, London"
+        frame.image_album = "Holiday"
+
+        frame.draw()
+
+        frame.graphics.measure_text.assert_any_call("Holiday", 2)
+        frame.graphics.text.assert_any_call(
+            "Holiday",
+            frame.WIDTH - 5 - 120,
+            frame.HEIGHT - 20,
+            120,
+            2,
+        )
+
+    def test_truncates_long_metadata_without_wrapping(self):
+        frame, _ = load_frame_module()
+        frame.graphics = Mock()
+        frame.graphics.measure_text.side_effect = lambda text, scale: (
+            120 if text == "Holiday" else len(text) * 10
+        )
+        jpeg = Mock()
+        frame.jpegdec.JPEG = Mock(return_value=jpeg)
+        frame.image_metadata = "A" * 100
+        frame.image_album = "Holiday"
+
+        frame.draw()
+
+        frame.graphics.text.assert_any_call(
+            "A" * 63 + "...",
+            5,
+            frame.HEIGHT - 20,
+            665,
             2,
         )
 

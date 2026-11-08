@@ -25,6 +25,7 @@ MAX_FETCH_ATTEMPTS = 20
 
 image_error = None
 image_metadata = ""
+image_album = ""
 
 
 def _metadata_url():
@@ -46,10 +47,11 @@ def _image_url_for_asset(metadata):
 
 
 def update():
-    global image_error, image_metadata
+    global image_error, image_metadata, image_album
 
     image_error = None
     image_metadata = ""
+    image_album = ""
     for attempt in range(MAX_FETCH_ATTEMPTS):
         try:
             metadata_response = urequest.urlopen(_metadata_url())
@@ -87,10 +89,10 @@ def update():
                     value for value in (
                         metadata.get("date"),
                         metadata.get("location"),
-                        metadata.get("album"),
                     )
                     if value
                 )
+                image_album = metadata.get("album", "")
         except (OSError, ValueError) as error:
             print(error)
             if attempt == MAX_FETCH_ATTEMPTS - 1:
@@ -111,6 +113,18 @@ def draw_error(message):
     graphics.text(message, 5, (HEIGHT // 2) - 10, WIDTH - 10, 2)
 
 
+def _truncate_text(text, max_width, scale):
+    if graphics.measure_text(text, scale) <= max_width:
+        return text
+
+    ellipsis = "..."
+    for length in range(len(text) - 1, -1, -1):
+        candidate = text[:length].rstrip() + ellipsis
+        if graphics.measure_text(candidate, scale) <= max_width:
+            return candidate
+    return ""
+
+
 def draw():
     graphics.set_pen(WHITE)
     graphics.clear()
@@ -126,11 +140,40 @@ def draw():
             print(error)
             draw_error("Unable to display image")
         else:
-            if image_metadata:
+            if image_metadata or image_album:
                 graphics.set_pen(WHITE)
                 graphics.rectangle(0, HEIGHT - 25, WIDTH, 25)
                 graphics.set_pen(BLACK)
-                graphics.text(image_metadata, 5, HEIGHT - 20, WIDTH - 10, 2)
+
+                album_width = (
+                    graphics.measure_text(image_album, 2) if image_album else 0
+                )
+                album_x = max(5, WIDTH - 5 - album_width)
+                if image_metadata:
+                    metadata_width = album_x - 10 if image_album else WIDTH - 10
+                    visible_metadata = _truncate_text(
+                        image_metadata,
+                        max(0, metadata_width),
+                        2,
+                    )
+                    graphics.text(
+                        visible_metadata,
+                        5,
+                        HEIGHT - 20,
+                        max(0, metadata_width),
+                        2,
+                    )
+
+                if image_album:
+                    album_x = max(5, WIDTH - 5 - album_width)
+                    album_width = WIDTH - 5 - album_x
+                    graphics.text(
+                        image_album,
+                        album_x,
+                        HEIGHT - 20,
+                        album_width,
+                        2,
+                    )
 
     gc.collect()
     graphics.update()

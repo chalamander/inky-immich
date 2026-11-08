@@ -93,8 +93,9 @@ Metadata display is off by default and can only be enabled by adding
 environment variable. When enabled, the frame requests the
 selected image's metadata and then fetches that same image, so the displayed
 details match the photo. The bottom of the screen shows the capture date,
-location, and first album name (when available), separated by commas. Missing
-details are omitted. Dates use an ordinal day and written month, e.g.
+location, and first album name (when available). The album name is
+right-aligned; the date and location remain left-aligned. Missing details are
+omitted. Dates use an ordinal day and written month, e.g.
 `6th May 2024`. Emoji characters are removed from album titles before display.
 Album names require the API key's `AlbumRead` permission.
 The metadata endpoint uses the same orientation, people, and tag filters as
