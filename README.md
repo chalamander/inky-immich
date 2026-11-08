@@ -6,6 +6,11 @@ A small web service that fetches a random Immich photo and prepares it for an
 800×480 Inky Frame (colour e-ink display + RPi pico 2 W). The frame can request a ready-to-display JPEG from
 `GET /image.jpg`.
 
+## Hardware
+
+- [Inky Frame 7.3" (Pico 2 W Aboard)](https://shop.pimoroni.com/products/inky-frame-7-3?variant=40541882056787)
+- A charity-shop wooden picture frame. (that almost fits the board perfectly)
+
 ## Installation (docker)
 
 ### Create an Immich API key
