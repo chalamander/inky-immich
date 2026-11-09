@@ -68,25 +68,40 @@ sure to set that value to the Docker host's LAN address.
 ## How to set up the Inky Frame for inky-immich
 
 First, follow the [Pimoroni Inky Frame setup guide](https://learn.pimoroni.com/article/getting-started-with-inky-frame)
-to prepare the device and set up Thonny. Open `immich_inky_frame.py` in Thonny
-and copy/save it to the Inky Frame.
+to prepare the device and set up Thonny. Create a `secrets.py` file on the
+frame with your Wi-Fi credentials:
 
-Before copying the script, change `IMAGE_URL` in the Python file to the
-`/image.jpg` URL for the server running inky-immich, for example
-`http://your-service-host:18765/image.jpg`. Add any query parameters from
-[Configuration parameters](#configuration-parameters) that you want to use.
+```python
+HOST_IP = "your-server-ip"
+HOST_PORT = 12345
+WIFI_SSID = "Your Wi-Fi SSID"
+WIFI_PASSWORD = "Your Wi-Fi password"
+```
 
-Once the script is on the device and the web server is running, the Inky Frame
-should retrieve and display images from the `/image.jpg` endpoint. If a
-download fails, the frame retries after a 10-second interval and shows an error
-after 20 failed attempts. The Inky Frame's `urequest.urlopen` implementation
-does not support a request timeout argument.
+Set `HOST_IP` to the LAN IP address of the computer running the inky-immich
+service and `HOST_PORT` to the port exposed by that service (18765 by default).
+`main.py` builds its image URL from these values. Keep Pimoroni's
+`inky_helper.py` on the frame as well; the script uses its RTC/VSYS-aware
+`sleep()` function between updates. To change the image request
+parameters, edit `IMAGE_URL` in `main.py`; see
+[Configuration parameters](#configuration-parameters).
+Save `main.py` and `secrets.py` to the Inky Frame and leave `inky_helper.py`
+there. The frame will connect to Wi-Fi, fetch and display an image immediately,
+then repeat every four hours. There is no launcher or separate `immich.py`
+required. If a request fails, the frame reconnects to Wi-Fi and retries after
+a 10-second interval, up to 200 attempts. The Inky Frame's
+`urequest.urlopen` implementation does not support a request timeout argument.
+Between updates, Wi-Fi is disabled before `inky_helper.sleep()` schedules the
+RTC timer and applies the VSYS hold control.
+
+Use the display constant matching your frame model if it is not the 7.3"
+Spectra model selected by default in `main.py`.
 
 ### Configuration parameters
 
-The service listens on host port `18765` (container port `8000`). The frame
-requests images from `http://your-service-host:18765/image.jpg`. This endpoint
-accepts the following optional query parameters:
+The service listens on host port `18765` by default (container port `8000`).
+The frame requests images from `http://<HOST_IP>:<HOST_PORT>/image.jpg`. This
+endpoint accepts the following optional query parameters:
 
 | Parameter | Description | Default |
 |---|---|---|
