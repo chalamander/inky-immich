@@ -160,10 +160,11 @@ selects a thumbnail with that orientation after applying EXIF rotation. The
 service applies EXIF orientation and, for portrait requests, rotates the image
 90° clockwise for a screen mounted at -90°. It then performs a centered
 aspect-preserving crop/resize to 800×480, lifts midtones with gamma correction,
-increases contrast and saturation, and returns a full-color JPEG for the
-Inky Frame's JPEG decoder to dither to the display's seven colors. The JPEG
-uses quality 90 and 4:2:0 chroma subsampling to keep file sizes suitable for
-the frame's limited storage.
+increases contrast, and strongly boosts saturation (factor 2.5) for an
+experimental extra-colorful look. It returns a full-color JPEG for the Inky
+Frame's JPEG decoder to dither to the display's seven colors. The JPEG uses
+quality 90 and 4:2:0 chroma subsampling to keep file sizes suitable for the
+frame's limited storage.
 
 Immich or image-processing failures return a JSON error with HTTP 502.
 Missing Immich configuration returns HTTP 503.
