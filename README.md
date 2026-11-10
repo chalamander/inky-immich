@@ -93,6 +93,12 @@ a 10-second interval, up to 200 attempts. The Inky Frame's
 `urequest.urlopen` implementation does not support a request timeout argument.
 Between updates, Wi-Fi is disabled before `inky_helper.sleep()` schedules the
 RTC timer and applies the VSYS hold control.
+Transient Wi-Fi connection and fetch failures are printed to the serial console
+without refreshing the display. After all fetch attempts fail, the display shows
+the failing request stage and exception details; HTTP status and response-body
+details are included when the frame's HTTP client exposes them. JPEG display
+failures show the decoder error. Long diagnostics wrap on the display and may
+be clipped; the full diagnostic is also printed to the serial console.
 
 Use the display constant matching your frame model if it is not the 7.3"
 Spectra model selected by default in `main.py`.

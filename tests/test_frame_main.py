@@ -72,6 +72,19 @@ class FrameMainTests(unittest.TestCase):
         wlan.active.assert_called_once_with(True)
         wlan.connect.assert_called_once_with("test-ssid", "test-password")
 
+    def test_wifi_timeout_does_not_refresh_display(self):
+        frame, _, wlan, _ = load_main_module()
+        frame.graphics = Mock()
+        frame.graphics.measure_text.side_effect = lambda text, scale: len(text) * 10
+        frame.WIFI_CONNECT_TIMEOUT_SECONDS = 1
+        wlan.isconnected.side_effect = [False, False, True]
+
+        with patch.object(frame.time, "sleep"):
+            frame.connect_wifi()
+
+        frame.graphics.update.assert_not_called()
+        frame.graphics.text.assert_not_called()
+
     def test_update_fetches_metadata_and_jpeg(self):
         frame, urequest, _, _ = load_main_module()
         metadata_response = types.SimpleNamespace(
@@ -110,6 +123,62 @@ class FrameMainTests(unittest.TestCase):
         self.assertIsNone(frame.image_error)
         metadata_response.close.assert_called_once_with()
         response.close.assert_called_once_with()
+
+    def test_fetch_failure_keeps_stage_and_exception_details(self):
+        frame, urequest, _, _ = load_main_module()
+        frame.MAX_FETCH_ATTEMPTS = 1
+        urequest.urlopen = Mock(side_effect=OSError("network unreachable"))
+
+        with (
+            patch.object(frame, "connect_wifi"),
+            patch("builtins.print"),
+        ):
+            frame.update()
+
+        self.assertIn("Fetch failed after 1 attempts.", frame.image_error)
+        self.assertIn("Metadata request to http://192.168.1.50:19000", frame.image_error)
+        self.assertIn("OSError: network unreachable", frame.image_error)
+
+    def test_http_error_includes_status_and_response_body(self):
+        frame, _, _, _ = load_main_module()
+        error = OSError("request failed")
+        error.code = 403
+        error.read = Mock(return_value=b'{"error":"Forbidden"}')
+
+        details = frame._format_error("Image request", error)
+
+        self.assertIn("HTTP 403", details)
+        self.assertIn('{"error":"Forbidden"}', details)
+        error.read.assert_called_once_with(513)
+
+    def test_http_error_response_body_is_bounded(self):
+        frame, _, _, _ = load_main_module()
+        error = OSError("request failed")
+        error.code = 500
+        error.read = Mock(return_value=b"x" * 513)
+
+        details = frame._format_error("Image request", error)
+
+        self.assertIn("Response: " + ("x" * 512) + "...", details)
+
+    def test_display_failure_draws_exception_details(self):
+        frame, _, _, _ = load_main_module()
+        frame.graphics = Mock()
+        frame.graphics.measure_text.side_effect = lambda text, scale: len(text) * 10
+        jpeg = Mock()
+        jpeg.decode.side_effect = RuntimeError("invalid JPEG marker")
+        frame.jpegdec.JPEG = Mock(return_value=jpeg)
+
+        frame.draw()
+
+        displayed_text = " ".join(
+            call.args[0] for call in frame.graphics.text.call_args_list
+        )
+        self.assertIn("RuntimeError: invalid JPEG marker", displayed_text)
+        self.assertIn("Displaying JPEG immich-image.jpg", displayed_text)
+        frame.graphics.rectangle.assert_called_once_with(
+            0, 0, frame.WIDTH, frame.HEIGHT
+        )
 
     def test_sleep_disables_wifi_and_uses_frame_rtc(self):
         frame, _, wlan, inky_helper = load_main_module()
